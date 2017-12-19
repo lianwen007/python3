@@ -7,7 +7,7 @@ from .models import Topic,Entry
 from .forms import TopicForm,EntryForm
 
 def check_topic_owner(request,istopic):
-    if istopic != request.user:
+    if istopic!=request.user:
         raise Http404
          
         
