@@ -20,7 +20,7 @@ for a,b in ressearch.items():
 				jsObj = json.dumps(mess)
 				fileObject = open('jsonFile1.json', 'a')
 				fileObject.write(jsObj+',\n')
-
+# 限定条件下ELK取出至TXT文件。
 
 '''
 for res in ressearch:
