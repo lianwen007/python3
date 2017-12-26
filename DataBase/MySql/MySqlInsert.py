@@ -18,3 +18,10 @@ try:
 except:
     print("Error")
 db.close()  
+
+
+
+# select操作并打印数据 
+info = cur.fetchmany(aa)
+for ii in info:
+    print ii
