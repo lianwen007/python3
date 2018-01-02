@@ -1,4 +1,6 @@
 # hive取时间，区别mysql： select from_unixtime(unix_timestamp()-60*60*24*1,'yyyy-MM-dd')
+# IMPORT在WIN平台失败
+
 
 import pyhs2
 import xlrd
