@@ -41,3 +41,4 @@ mess=str(st1)+'\tyunzuoye'+'\t'+str(st2)+'\t'+str(st3)+'\t'+str(st12)+'\t'\
     +'\t'+str(st13)+'\t'+str(st14)+'\t'+'2017-01-11'+'\n'
 fileObject = open('F:\StudentWork.txt', 'a')
 fileObject.write(mess)
+fileObject.close()
