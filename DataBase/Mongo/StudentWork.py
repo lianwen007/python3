@@ -34,7 +34,7 @@ for messa in ressearch:
             st9=b 
         elif a=='lectureTimes':
             for c in b:
-                if b['listenTimes']>0:
+                if b['listenTimes']>=0:
                     st10+=b['listenTimes']
         elif a=='schedule':
             st11=b
