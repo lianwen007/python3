@@ -14,7 +14,7 @@ import datetime
 db=pymysql.connect(host="localhost",port=3306,user="root",passwd="123",db="hadoop",charset="utf8")
 cursor=db.cursor()
 sql="insert into school_grade_user values(%s,%s,%s,%s,%s,%s,%s,%s)"
-ndate=datetime.datetime.now() + datetime.timedelta(days=-1)
+#ndate=datetime.datetime.now() + datetime.timedelta(days=-1)
 
 try:
     for i in range(100):
