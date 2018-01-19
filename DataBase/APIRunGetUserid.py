@@ -39,8 +39,8 @@ def get_mysql_conn(userid=''):
         mess['finalstatus']=results[18]
         mess['datetime']=results[19]
     except:
-        mess['error']=404
+        mess['error']='Userid '+ userid + ' is not exist!'
     db.close()
     return json.dumps(mess)
     
-app.run(host='0.0.0.0',port=8802,debug=Tr
+app.run(host='0.0.0.0',port=8802,debug=True)
