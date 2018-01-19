@@ -3,7 +3,7 @@ import pymysql
 import json
 
 app = Flask(__name__)#创建一个服务，赋值给APP
-@app.route('/get_user',methods=['get'])#指定接口访问的路径，支持什么请求方式get，post
+@app.route('/get_user',methods=['post'])#指定接口访问的路径，支持什么请求方式get，post
 def get_ss():
     userid = request.args.get('userid')#使用request.args.get方式获取拼接的入参数据
     #userid = request.json.get('userid') #获取带json串请求的userid参数传入的值
