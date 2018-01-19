@@ -41,6 +41,6 @@ def get_mysql_conn(userid=''):
     except:
         mess['error']='Userid '+ userid + ' is not exist!'
     db.close()
-    return json.dumps(mess)
+    return json.dumps(mess , ensure_ascii=False)
     
 app.run(host='0.0.0.0',port=8802,debug=True)
