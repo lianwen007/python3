@@ -8,6 +8,7 @@ from flask import Flask,request
 import pymysql
 import json
 
+tablename='user_file_product'
 
 app = Flask(__name__)#创建一个服务，赋值给APP
 @app.route('/bigdata/user_file_product/getuserid',methods=['get'])#指定接口访问的路径，支持什么请求方式get，post
@@ -23,12 +24,12 @@ def get_mysql_desc():
     db2=pymysql.connect(host="localhost",port=3306,
                        user="root",passwd="123",db="elasticsearch",charset="utf8")
     cursor2=db2.cursor()
-    sqldesc="DESC user_file_product"
+    sqldesc="DESC " + tablename
 
     mysqldescs=[]
     try:
         cursor2.execute(sqldesc)
-        descnames=cursor2.fetchall()
+        descnames = cursor2.fetchall()
         for descname in descnames:
             mysqldesc=descname[:][0]
             mysqldescs.append(mysqldesc)
@@ -39,10 +40,11 @@ def get_mysql_desc():
 
 def get_mysql_conn(userid=''):
     #userid='60219'
+    keywords = 'userid'
     db1=pymysql.connect(host="localhost",port=3306,
                    user="root",passwd="123",db="elasticsearch",charset="utf8")
     cursor1=db1.cursor()
-    sql="SELECT * FROM user_file_product WHERE userid = %s"%(userid)
+    sql="SELECT * FROM "+ tablename +" WHERE "+ keywords + " = %s"%(userid)
     messnames=get_mysql_desc()
     mess={}
     
