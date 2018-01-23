@@ -21,24 +21,26 @@ def get_ss():
 
     
 def get_mysql_desc():
+    """查询数据库表的字段名称，传入参数备用"""
     db2=pymysql.connect(host="localhost",port=3306,
                        user="root",passwd="123",db="elasticsearch",charset="utf8")
     cursor2=db2.cursor()
     sqldesc="DESC " + tablename
-
-    mysqldescs=[]
+    #mysqldescs=[]
     try:
         cursor2.execute(sqldesc)
         descnames = cursor2.fetchall()
-        for descname in descnames:
-            mysqldesc=descname[:][0]
-            mysqldescs.append(mysqldesc)
+        mysqldescs=[descname[:][0] for descname in descnames]
+        #for descname in descnames:
+            #mysqldesc=descname[:][0]
+            #mysqldescs.append(descname[:][0])
     except:
         'Error'
     db2.close()
     return mysqldescs
 
 def get_mysql_conn(userid=''):
+    """根据条件进行查询，将字段名称和字段值对应，产出JSON格式"""
     #userid='60219'
     keywords = 'userid'
     db1=pymysql.connect(host="localhost",port=3306,
