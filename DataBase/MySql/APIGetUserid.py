@@ -7,6 +7,7 @@ Created on Sat Jan 20 09:53:44 2018
 from flask import Flask,request
 import pymysql
 import json
+#平均耗时2.05s
 
 tablename='user_file_product'
 
