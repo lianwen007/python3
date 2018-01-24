@@ -1,6 +1,7 @@
 from flask import Flask,request
 import pymysql
 import json
+#平均耗时1.02s
 
 app = Flask(__name__)#创建一个服务，赋值给APP
 @app.route('/bigdata/user_file_product/getuserid',methods=['post'])#指定接口访问的路径，支持什么请求方式get，post
