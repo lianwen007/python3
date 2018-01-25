@@ -10,13 +10,12 @@ class Userlogin(object):
     
     def __init__(self,getType,username,password):
         self.getType=getType
-        self.username=username.upper()
+        self.username=username
         self.password=password.upper()
         self.conn=pymysql.connect(host="localhost",port=3306,
                            user="root",passwd="123",db="elasticsearch",charset="utf8")
         self.checkuserpoint='wrong'
         self.checkpwdpoint='wrong'
-        
     def checkusername(self):
         """检查用户名是否存在，存在则改变关键字段信息"""
         cursor=self.conn.cursor()
@@ -60,11 +59,11 @@ class Userlogin(object):
     def main(self):
         Userlogin.checkusername(self)
         Userlogin.checkpassword(self)
-        if self.checkuserpoint=='wrong':
+        if self.checkuserpoint!='right':
             data='Username '+ self.username + ' is not exist!'
         
-        elif self.checkpwdpoint=='wrong':
-            data='Your password  is wrong! Check it please!'
+        elif self.checkpwdpoint!='right':
+            data='Your password is wrong! Check it please!'
         else:
             data=Userlogin.getuserinfo(self)
         return data
