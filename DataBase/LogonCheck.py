@@ -9,7 +9,6 @@ import pymysql
 class Userlogin(object):
     
     def __init__(self,username,password):
-        #self.getType=getType
         self.username=username
         self.password=password.upper()
         self.conn=pymysql.connect(host="localhost",port=3306,
@@ -17,7 +16,7 @@ class Userlogin(object):
         self.checkuserpoint='wrong'
         self.checkpwdpoint='wrong'
     def checkusername(self):
-        """检查用户名是否存在，存在则改变关键字段信息"""
+        #检查用户名是否存在，存在则改变关键字段信息
         cursor=self.conn.cursor()
         try:
             usersql="select * from xhsys_user where sLogonName= '%s'"%(self.username)
@@ -28,15 +27,15 @@ class Userlogin(object):
         finally:
             cursor.close()
     def checkpassword(self):
-        """如果用户名正确，检查密码，如果正确则下一步"""
+        #如果用户名正确，检查密码，如果正确则下一步
         cursor=self.conn.cursor()
         if self.checkuserpoint=='right':
             try:
-                sqlsel="select * from xhsys_user \
-                        where sLogonName = '%s' and sLogonPwd= '%s' "%(self.username,self.password)
+                sqlsel="select sLogonPwd from xhsys_user \
+                        where sLogonName = '%s' "%(self.username)
                 cursor.execute(sqlsel)
                 rs=cursor.fetchall()
-                if len(rs) == 1:
+                if len(rs) == 1 and str(rs[0][0]).upper()==self.password:
                     self.checkpwdpoint='right'
             finally:
                 cursor.close()
@@ -47,7 +46,7 @@ class Userlogin(object):
         if self.checkuserpoint=='right' and self.checkpwdpoint=='right':
             try:
                 sqlsel="select iUserId,sLogonName,iUserType,sSelfPhone \
-                        from xhsys_user where sLogonName = '%s' and sLogonPwd= '%s' "%(self.username,self.password)
+                        from xhsys_user where sLogonName = '%s' and upper(sLogonPwd)= '%s' "%(self.username,self.password)
                 cursor.execute(sqlsel)
                 results=cursor.fetchone()
                 if len(results)!=0:
@@ -61,7 +60,6 @@ class Userlogin(object):
         Userlogin.checkpassword(self)
         if self.checkuserpoint!='right':
             data='Username '+ self.username + ' is not exist!'
-        
         elif self.checkpwdpoint!='right':
             data='Your password is wrong! Check it please!'
         else:
