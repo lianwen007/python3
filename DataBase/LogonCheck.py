@@ -65,4 +65,4 @@ class Userlogin(object):
             data='Your password  is wrong! Check it please!'
         else:
             data=Userlogin.getuserinfo(self)
-        print(data)
+        return data
