@@ -8,8 +8,8 @@ import pymysql
 
 class Userlogin(object):
     
-    def __init__(self,getType,username,password):
-        self.getType=getType
+    def __init__(self,username,password):
+        #self.getType=getType
         self.username=username
         self.password=password.upper()
         self.conn=pymysql.connect(host="localhost",port=3306,
