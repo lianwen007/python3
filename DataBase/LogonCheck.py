@@ -69,5 +69,5 @@ class Userlogin(object):
         return data
 
 if __name__=="__main__":
-    s=Userlogin('1','wangziwei','a23b5d3bd4f0d8fa2ec9cef81068d137')
+    s=Userlogin('wangziwei','a23b5d3bd4f0d8fa2ec9cef81068d137')
     print(s.main())
