@@ -34,7 +34,7 @@ class Userlogin(object):
                 sqlsel="select sLogonPwd from xhsys_user \
                         where sLogonName = '%s' "%(self.username)
                 cursor.execute(sqlsel)
-                rs=cursor.fetchall()
+                rs=cursor.fetchall() #取出密码转为全大写，然后做对比
                 if len(rs) == 1 and str(rs[0][0]).upper()==self.password:
                     self.checkpwdpoint='right'
             finally:
