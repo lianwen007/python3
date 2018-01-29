@@ -13,7 +13,7 @@ app = Flask(__name__)#创建一个服务，赋值给APP
 @app.route('/bigdata/getuserinfo',methods=['post'])#指定接口访问的路径，支持什么请求方式get，post
 def get_ss():
     #start = time.clock()
-    username = request.json.get('username') #使用request.args.get方式获取拼接的入参数据
+    username = request.json.get('username')
     pwd = request.json.get('password')
     #username = request.args.get('userid') #使用request.args.get方式获取拼接的入参数据
     #userid = request.json.get('userid') #获取带json串请求的userid参数传入的值
@@ -76,11 +76,15 @@ class Userlogin(object):
         Userlogin.checkpassword(self)
         data={}
         if self.checkuserpoint!='right':
-            data['error']='Username '+ self.username + ' is not exist!'
+            data['code']=-1
+            data['msg']='Username '+ self.username + ' is not exist!'
         elif self.checkpwdpoint!='right':
-            data['error']='Your password is wrong! Check it please!'
+            data['code']=-1
+            data['msg']='Your password is wrong! Check it please!'
         else:
-            data=Userlogin.getuserinfo(self)
+            data['code']=200
+            data['data']=Userlogin.getuserinfo(self)
+            data['msg']='Login successful!'
         return data
 
 app.run(host='0.0.0.0',port=8808,debug=True)  
