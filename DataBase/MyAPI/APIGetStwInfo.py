@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+#20180202-Update 增加schoolid检查，若无则返回错误信息
 """
 Created on Thu Feb  1 20:45:56 2018
 
@@ -17,14 +18,26 @@ def get_ss():
     endedtime = request.json.get('endedtime')
     #userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
     s=Getstwinfo(schoolid,starttime,endedtime)
-    return schoolid+json.dumps(s.main() , ensure_ascii=False)
+    return json.dumps(s.main() , ensure_ascii=False)
+
 
 class Getstwinfo(object):
     def __init__(self,schoolid,starttime,endedtime):
         self.schoolid=str(schoolid)
         self.starttime=starttime
         self.endedtime=endedtime
-        self.conn=connect(host='nat.yunzuoye.net', port=6667,timeout=3600)
+        self.conn=connect(host='172.16.10.141', port=21050,timeout=3600)
+        self.checkscid=''
+
+    def checkschoolid(self):
+        sql="select distinct schoolid from xh_basecount.product_stw_daycount where schoolid in (%s) \
+                and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)"%(self.schoolid,self.starttime,self.endedtime)
+        cur = self.conn.cursor()
+        cur.execute(sql)
+        rs=cur.fetchall()
+        if len(rs)>0:
+            self.checkscid='right'
+        
     def getkinginfo(self):
         descnames=['userid','username','schoolid','schoolname','classname','classid',
         'bookname','bookid','hp','credit','countscore','numhomework','numselfwork',
@@ -42,22 +55,15 @@ class Getstwinfo(object):
             messes.append(mess)
         return messes
     def main(self):
+        Getstwinfo.checkschoolid(self)
         data={}
-        if self.schoolid:
+        if self.checkscid=='right':
             data['code']=200
             data['data']=Getstwinfo.getkinginfo(self)
             data['msg']='successful!'
+        else:
+            data['code']=-1
+            data['msg']='These schools is not exist!'
         return data
 
-app.run(host='0.0.0.0',port=8802,debug=True,threaded=True)
-
-
-#from impala.dbapi import connect
-#from impala.util import as_pandas
-#conn = connect(host='10.161.20.11', port=21050)
-#cur = conn.cursor()
-#cur.execute('SHOW TABLES')
-#cur.execute('SELECT * FROM businfo')
-#data = as_pandas(cur)
-#print (data)
-#print (type(data))
+app.run(host='172.16.20.222',port=18890,debug=True,threaded=True)
