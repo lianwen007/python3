@@ -3,7 +3,7 @@
 #####  <p id="jsontocsv">jsontocsv</p>
 
 #### "/bigdata/product_stw/getstwinfo"<a name="#getstwinfo"></a> 
-```json
+```
 POST:
 {
 "schoolid":"3495,760",
@@ -20,7 +20,7 @@ RETURN:
 ```
 
 #### "/bigdata/product_stw/jsontocsv"<a name="#jsontocsv"></a> 
-```json
+```
 POST:
 {
 form-data(
