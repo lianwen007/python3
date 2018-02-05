@@ -13,14 +13,16 @@ app = Flask(__name__)#创建一个服务，赋值给APP
 
 @app.route('/bigdata/user_file_product/getinfo',methods=['post'])    
 def get_userinfo():
-    stwdata=str(request.json.get('stwdata'))
+    stwdata=request.values.get('stwdata')
     #schoolid = str(request.json.get('schoolid')) #获取带json串请求的userid参数传入的值
-    s=Tranjsoncsv(stwdata)
+    s=Tranjsoncsv(stwdata)#(str(stwdata))
     content=s.jsontocsv()
     response = make_response(content)
     response.headers["Content-Disposition"] = "attachment; filename=myfilename.csv;"
     
     return response
+
+
 
 class Tranjsoncsv(object):
     def __init__(self,jsonstr):
