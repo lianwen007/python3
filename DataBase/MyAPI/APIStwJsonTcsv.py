@@ -18,11 +18,9 @@ def get_userinfo():
     s=Tranjsoncsv(stwdata)#(str(stwdata))
     content=s.jsontocsv()
     response = make_response(content)
+    response.headers["Content-Type"] ="text/html; charset=gb2312"
     response.headers["Content-Disposition"] = "attachment; filename=Stwdata.csv;"
-    
     return response
-
-
 
 class Tranjsoncsv(object):
     def __init__(self,jsonstr):
@@ -31,6 +29,7 @@ class Tranjsoncsv(object):
     def jsontocsv(self):
         val,val2='',''
         valuename=['schoolid','schoolname','bookname','classname','username','hp','credit','countscore','numhomework','numselfwork','topicnum','countright','rightlv','counttime']
+        valuenamechn=['学校ID','学校名称','书名','班级','姓名','体力','诚信分','积分','作业次数','自练次数','做题量','正确地梁','正确率','平均做题时间(秒)']
         jsonvalues=json.loads(self.jsonstr)
         #for keyname in jsonvalues[0].keys():
         #    data.append(keyname)    
