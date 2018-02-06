@@ -78,9 +78,11 @@ class Getstwinfo(object):
         mesindex=list(set(mesind))
         for y in mesindex:
             findata={}
+            dataz=[]
             for mes in messes:
                 if mes['userid']==y:
-                    findata[y]=mes
+                    dataz.append(mes)
+                findata[y]=dataz
             finad.append(findata)
         return finad
     def main(self):
@@ -115,7 +117,7 @@ class Tranjsoncsv(object):
             datav = ','.join(valuenamechn)+'\n'+val2
         return datav.encode('gb2312')
         
-app.run(host='0.0.0.0',port=8807,debug=True,threaded=True)
+app.run(host='0.0.0.0',port=8809,debug=True,threaded=True)
 
 
 #from impala.dbapi import connect
