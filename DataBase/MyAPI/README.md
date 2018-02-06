@@ -1,6 +1,7 @@
 ## API desc
 #####  <p id="getstwinfo">getstwinfo</p>
 #####  <p id="jsontocsv">jsontocsv</p>
+#####  <p id="getuserinfo">UserLogon</p>
 
 #### "/bigdata/product_stw/getstwinfo"<a name="#getstwinfo"></a> 
 ```
@@ -14,8 +15,8 @@ POST:
 RETURN:
 { 
 "code": int,
-"msg": string,
-"data":[ json ]
+"msg": 'string',
+"data":'[ json ]'
 }
 ```
 
@@ -29,3 +30,17 @@ form-data(
     )
 }
 ```
+#### "/bigdata/getuserinfo"<a name="#getuserinfo"></a>
+```
+POST:
+{
+    "username":"string",
+    "password":"MD5-string"
+}
+RETURN:
+{
+    "userid": int,
+    "logonName": "string",
+    "userType": int,
+    "userPhone": int,
+}
