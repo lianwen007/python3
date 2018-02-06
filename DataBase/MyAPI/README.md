@@ -15,7 +15,7 @@ POST:
 RETURN:
 { 
 "code": int,
-"msg": 'string',
+"msg": "string",
 "data":'[ json ]'
 }
 ```
