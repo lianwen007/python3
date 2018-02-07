@@ -37,7 +37,7 @@ def get_userinfo():
     
     return response
 conne=connect(host='172.16.10.141', port=21050,timeout=3600) #生产环境
-#conn=connect(host='bigdata03.yunzuoye.net', port=6667,timeout=3600) #开发环境
+#conn=connect(host='bigdata03.yunzuoye.net', port=*,timeout=3600) #开发环境
 class Getstwinfo(object):
     def __init__(self,schoolid,starttime,endedtime,bookid,classname):
         self.schoolid=str(schoolid)
