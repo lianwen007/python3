@@ -6,11 +6,12 @@ app = Flask(__name__)#创建一个服务，赋值给APP
 @app.route('/bigdata/product_stw/getstwinfo',methods=['post'])#指定接口访问的路径，支持什么请求方式get，post
 def get_ss():
     #userid = request.args.get('userid') #使用request.args.get方式获取拼接的入参数据
-    schoolid = str(request.json.get('schoolid')) #获取带json串请求的userid参数传入的值
+    schoolid = request.json.get('schoolid') #获取带json串请求的userid参数传入的值
     starttime = request.json.get('starttime')
     endedtime = request.json.get('endedtime')
     bookid = request.json.get('bookid')
     classname = request.json.get('classname')
+    gettype = request.json.get('gettype')
     #userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
     if starttime is None or starttime == 0:
         starttime = int(time.time())-691200
@@ -18,7 +19,10 @@ def get_ss():
         endedtime = int(time.time())
     if classname is None or classname == 0:
         classname = '%'
-    s=Getstwinfo(schoolid,starttime,endedtime,bookid,classname)
+    if gettype == 'getbookid':
+        s=Getbookid(schoolid)
+    else:
+        s=Getstwinfo(schoolid,starttime,endedtime,bookid,classname)        
     return json.dumps(s.main() , ensure_ascii=False)
     
 @app.route('/bigdata/product_stw/jsontocsv',methods=['post'])    
@@ -32,7 +36,8 @@ def get_userinfo():
     response.headers["Content-Disposition"] = "attachment; filename=Stwdata.csv;"
     
     return response
-
+conne=connect(host='172.16.10.141', port=21050,timeout=3600) #生产环境
+#conn=connect(host='bigdata03.yunzuoye.net', port=6667,timeout=3600) #开发环境
 class Getstwinfo(object):
     def __init__(self,schoolid,starttime,endedtime,bookid,classname):
         self.schoolid=str(schoolid)
@@ -40,7 +45,7 @@ class Getstwinfo(object):
         self.endedtime=endedtime
         self.bookid=bookid
         self.classname=classname
-        self.conn=connect(host='bigdata03.yunzuoye.net', port=6667,timeout=3600)
+        self.conn=conne
         self.checkscid=''
 
     def checkschoolid(self):
@@ -116,8 +121,49 @@ class Tranjsoncsv(object):
             val2=val2+val+'\n'
             datav = ','.join(valuenamechn)+'\n'+val2
         return datav.encode('gb2312')
+
+class Getbookid(object):
+    def __init__(self,schoolid=None):
+        self.schoolid=schoolid
+        self.conn=conne
+    def findallbookid(self):
+        sqlsel="select distinct bookname,bookid from xh_basecount.product_stw_daycount"      
+        descnames=['bookname','bookid']             
+        cur = self.conn.cursor()
+        cur.execute(sqlsel)
+        data_list=cur.fetchall()
+        messes=[]
+        for datas in data_list:
+            mess={}
+            for x in range(len(datas)):
+                mess[descnames[x]]=datas[x]
+            messes.append(mess)
+        return messes
+    def findbookidbysc(self):
+        sqlsel="select distinct bookname,bookid from xh_basecount.product_stw_daycount where schoolid in (%s)"%(self.schoolid)
+        descnames=['bookname','bookid']             
+        cur = self.conn.cursor()
+        cur.execute(sqlsel)
+        data_list=cur.fetchall()
+        messes=[]
+        for datas in data_list:
+            mess={}
+            for x in range(len(datas)):
+                mess[descnames[x]]=datas[x]
+            messes.append(mess)
+        return messes        
+    def main(self):
+        if self.schoolid: 
+            datav=Getbookid.findbookidbysc(self)
+        else:
+            datav=Getbookid.findallbookid(self)
+        data={}
+        data['code']=200
+        data['data']=datav
+        data['msg']='successful!'
+        return data
         
-app.run(host='0.0.0.0',port=8809,debug=True,threaded=True)
+app.run(host='0.0.0.0',port=18890,debug=True,threaded=True)
 
 
 #from impala.dbapi import connect
