@@ -60,7 +60,7 @@ def get_news(publication):
 def get_weather(city):
     code = WEATHERS.get(city, 101010100)
     url = "http://www.weather.com.cn/data/sk/{0}.html".format(code)
-
+            # http://stock.jrj.com.cn/share,{0},stockyanbao.shtml  研投
     r = requests.get(url)
     r.encoding = 'utf-8'
 
