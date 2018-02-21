@@ -1,2 +1,2 @@
 # Django Prodject
-### Learning Logs Test Project.
+### Learning Logs For Test Project.
