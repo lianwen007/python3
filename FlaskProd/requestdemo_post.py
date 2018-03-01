@@ -25,3 +25,5 @@ s = json.dumps({
 })
 r = requests.post(url, data=s, headers=headers)
 print (r.text + str(r.status_code))
+
+# Learn : http://docs.python-requests.org/zh_CN/latest/user/quickstart.html
