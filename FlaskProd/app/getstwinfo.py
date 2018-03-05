@@ -138,3 +138,6 @@ class Getbookid(object):
         data['msg'] = 'successful!'
         #log('logInfo:Getbookid - ', data['code'])
         return data
+@getstwinfo.route('/bigdata/product_stw/getid', methods=['GET'])
+def getid():
+    return 'GET METHOD test successful！'
