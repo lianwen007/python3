@@ -1,10 +1,12 @@
+# 0307-增加HP等字段的实时调用接口
 from flask import Blueprint, render_template, redirect,request
 from app import app
 from .relog import log
 #from .models import Stwdaycount
-import json,time
+import json,time,requests
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
+
 getstwinfo = Blueprint('getstwinfo',__name__)
 
 @getstwinfo.route('/bigdata/product_stw/getstwinfo', methods=['post'])  # 指定接口访问的路径，支持什么请求方式get，post
@@ -33,7 +35,7 @@ def get_stwinfo():
         s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid)
         logInfogetbk= 'type[getinfo]' + 'scid['+schoolid+']'
     logInfo=logInfogetbk+'sttime['+str(starttime)+']'+'endtime['+str(endedtime)+']' +'bkid['+str(bookid)+']'+'clid['+str(classid)+']'
-    #log('logInfo:APIRequest - ', logInfo)
+    log('logInfo:APIRequest - ', logInfo)
     return json.dumps(s.main(), ensure_ascii=False)
 
 class Getstwinfo(object):
@@ -77,10 +79,29 @@ class Getstwinfo(object):
         for mes in messes:
             mesind.append(mes['userid'])
         mesindex = list(set(mesind))
+        if self.classid == '%' or self.classid is None or self.classid==0:
+            getdata = {"schoolIds": self.schoolid, "password": "king123456", }
+        else:
+            getdata = {"schoolIds": self.schoolid,"classIds": self.classid, "password": "king123456", }
+        url = 'http://127.0.0.1:18889/student/studentInfo'
+        try:
+            reqdatas = requests.get(url, params=getdata).json()
+        except:
+            reqdatas=[]
+        if reqdatas != []:
+            zdatas = []
+            for xdata in messes:
+                for reqdata in reqdatas:
+                    if reqdata["studentId"] == xdata["userid"]:
+                        xdata["hp"] = reqdata["hp"]
+                        xdata["credit"] = reqdata["credit"]
+                zdatas.append(xdata)
+        else:
+            zdatas=messes
         for y in mesindex:
             # findata=[]
             dataz = []
-            for mes in messes:
+            for mes in zdatas:
                 if mes['userid'] == y:
                     dataz.append(mes)
             # findata.append(dataz)
@@ -115,7 +136,7 @@ class Getbookid(object):
             messes.append(mess)
         return messes
     def findbookidbysc(self):
-        sqlsel = "select distinct bookname,bookid from product_stw_daycount where schoolid in (%s)" % (
+        sqlsel = "select distinct book name,bookid from product_stw_daycount where schoolid in (%s)" % (
             self.schoolid)
         descnames = ['bookname', 'bookid']
         data_list  = db.session.execute(sqlsel)
@@ -136,8 +157,8 @@ class Getbookid(object):
         data['code'] = 200
         data['data'] = datav
         data['msg'] = 'successful!'
-        #log('logInfo:Getbookid - ', data['code'])
+        log('logInfo:Getbookid - ', data['code'])
         return data
 @getstwinfo.route('/bigdata/product_stw/getid', methods=['GET'])
 def getid():
-    return 'GET METHOD test successful！'
+    return 'test success'
