@@ -1,5 +1,7 @@
 from app import app
-from .getstwinfo import getstwinfo
+from .getStwInfo import getStwInfo
+from .getKpiInfo import getKpiInfo
 
-app.register_blueprint(getstwinfo,url_prefix='')
+app.register_blueprint(getStwInfo,url_prefix='')
+app.register_blueprint(getKpiInfo,url_prefix='')
 #app.register_blueprint(user, url_prefix='/user')
