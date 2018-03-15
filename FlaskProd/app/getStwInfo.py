@@ -1,4 +1,4 @@
-# 0315-增加全量数据，接口调取时的内部计算
+# 0315-增加全量数据，接口调取时的内部计算，优化处理速度
 # 0313-日志结构变更，规范标题大小写
 # 0307-增加HP等字段的实时调用接口
 
@@ -126,6 +126,7 @@ class Getstwinfo(object):
                             rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
             rdatafin.append(rdata)
         url = 'http://127.0.0.1:18889/student/studentInfo'
+        #url = 'http://bigdata.yunzuoye.net/student/studentInfo'
         try:
             reqdatas = requests.get(url, params=getdata).json()
         except:
@@ -134,27 +135,31 @@ class Getstwinfo(object):
         findescnames = ['countscore', 'numhomework', 'numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime']
         alldatas = []
         for allmess in allmesses:
-            for reqdata in reqdatas:
-                for rdataf in rdatafin:
-                    if reqdata["studentId"] == int(allmess["userid"]):
-                        allmess["hp"] = reqdata["hp"]
-                        allmess["credit"] = reqdata["credit"]
-                    if rdataf["userid"] == int(allmess["userid"]):
-                        allmess["countscore"] = rdataf["countscore"]
-                        allmess["numhomework"] = rdataf["numhomework"]
-                        allmess["numselfwork"] = rdataf["numselfwork"]
-                        allmess["topicnum"] = rdataf["topicnum"]
-                        allmess["countright"] = rdataf["countright"]
-                        allmess["rightlv"] = rdataf["rightlv"]
-                        allmess["counttime"] = rdataf["counttime"]
+            for rdataf in rdatafin:
+                if rdataf["userid"] == int(allmess["userid"]):
+                    allmess["countscore"] = rdataf["countscore"]
+                    allmess["numhomework"] = rdataf["numhomework"]
+                    allmess["numselfwork"] = rdataf["numselfwork"]
+                    allmess["topicnum"] = rdataf["topicnum"]
+                    allmess["countright"] = rdataf["countright"]
+                    allmess["rightlv"] = rdataf["rightlv"]
+                    allmess["counttime"] = rdataf["counttime"]
             if len(allmess) == len(self.alldescs):
-                allmess["credit"] = allmess["hp"] = 0
-            if len(allmess) == len(self.alldescs) + 2:
                 for findena in findescnames:
                     allmess[findena] = 0
             alldatas.append(allmess)
+        lastdatas = []
+        for adatas in alldatas:
+            for reqdata in reqdatas:
+                if reqdata["studentId"] == int(adatas["userid"]):
+                    adatas["hp"] = reqdata["hp"]
+                    adatas["credit"] = reqdata["credit"]
+            if len(adatas) == len(self.alldescs) + len(findescnames):
+                adatas["credit"] = adatas["hp"] = 0
+            adatas['bookname'] = rdatafin[0]['bookname']
+            lastdatas.append(adatas)
 
-        return alldatas
+        return lastdatas
 
     def main(self):
         Getstwinfo.checkschoolid(self)
