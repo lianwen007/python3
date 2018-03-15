@@ -1,3 +1,4 @@
+# 0315-增加全量数据，接口调取时的内部计算
 # 0313-日志结构变更，规范标题大小写
 # 0307-增加HP等字段的实时调用接口
 
@@ -43,6 +44,7 @@ class Getstwinfo(object):
         self.classid = classid
         self.checkscid = ''
         self.traceId=traceId
+        self.alldescs = ['userid', 'username', 'schoolid', 'classname']
 
     def checkschoolid(self):
         sql = "select distinct schoolid from product_stw_daycount where schoolid in (%s) \
@@ -51,6 +53,23 @@ class Getstwinfo(object):
         rs = db.session.execute(sql)
         if len([chrs for chrs in rs ])>0:
             self.checkscid = 'right'
+
+    def get_all_user(self):
+        alldescs=self.alldescs
+        if self.classid is None or self.classid == '' or self.classid == 0:
+            sqlsel = "select DISTINCT userid,username,schoolid,classname from teacher_student_info " \
+                     "where classname!='教师' AND schoolid in (%s)" % (self.schoolid)
+        else:
+            sqlsel = "select DISTINCT userid,username,schoolid,classname from teacher_student_info  " \
+                     "where classname!='教师' AND schoolid in (%s) and classid in (%s)"% (self.schoolid,self.classid)
+        data_lists = db.session.execute(sqlsel)
+        messes = []
+        for datas in data_lists:
+            mess = {}
+            for x in range(len(datas)):
+                mess[alldescs[x]] = datas[x]
+            messes.append(mess)
+        return messes
 
     def getkinginfo(self):
         descnames = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'classid',
@@ -61,11 +80,13 @@ class Getstwinfo(object):
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s) \
                 and bookid like '%s' order by `datetime` DESC " % (
             self.schoolid, self.starttime, self.endedtime, self.bookid)
+            getdata = {"schoolIds": self.schoolid, "password": "king123456", }
         else:
             sqlsel = "select * from product_stw_daycount where schoolid in (%s) \
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s) \
                 and classid in (%s) and bookid like '%s' order by `datetime` DESC " % (
             self.schoolid, self.starttime, self.endedtime, self.classid, self.bookid)
+            getdata = {"schoolIds": self.schoolid, "classIds": self.classid, "password": "king123456", }
         data_list  = db.session.execute(sqlsel)
         messes, mesind, finad = [], [], []
         for datas in data_list:
@@ -76,34 +97,64 @@ class Getstwinfo(object):
         for mes in messes:
             mesind.append(mes['userid'])
         mesindex = list(set(mesind))
-        if self.classid == '%' or self.classid is None or self.classid==0:
-            getdata = {"schoolIds": self.schoolid, "password": "king123456", }
-        else:
-            getdata = {"schoolIds": self.schoolid,"classIds": self.classid, "password": "king123456", }
+        for y in mesindex:
+            # findata=[]
+            dataz = []
+            for mes in messes:
+                if mes['userid'] == y:
+                    dataz.append(mes)
+            # findata.append(dataz)
+            finad.append(dataz)
+        rdatafin = []
+        for dataf in finad:
+            rdata = {}
+            num = [0, 0, 0, 0, 0, 0]
+            for z in range(len(dataf)):
+                for i in range(len(dataf[z])):
+                    if i <= 10:
+                        rdata[descnames[i]] = dataf[0][descnames[i]]
+                    elif i <= 16:
+                        if dataf[z][descnames[i]] == None:
+                            dataf[z][descnames[i]] = 0
+                        num[i - 11] += dataf[z][descnames[i]]
+                        rdata[descnames[i]] = num[i - 11]
+                    else:
+                        if rdata[descnames[13]] == 0:
+                            rdata[descnames[15]] = rdata[descnames[16]] = 0
+                        else:
+                            rdata[descnames[15]] = int((rdata[descnames[14]] / rdata[descnames[13]]) * 1000) / 10
+                            rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
+            rdatafin.append(rdata)
         url = 'http://127.0.0.1:18889/student/studentInfo'
         try:
             reqdatas = requests.get(url, params=getdata).json()
         except:
             reqdatas=[]
-        if reqdatas != []:
-            zdatas = []
-            for xdata in messes:
-                for reqdata in reqdatas:
-                    if reqdata["studentId"] == xdata["userid"]:
-                        xdata["hp"] = reqdata["hp"]
-                        xdata["credit"] = reqdata["credit"]
-                zdatas.append(xdata)
-        else:
-            zdatas=messes
-        for y in mesindex:
-            # findata=[]
-            dataz = []
-            for mes in zdatas:
-                if mes['userid'] == y:
-                    dataz.append(mes)
-            # findata.append(dataz)
-            finad.append(dataz)
-        return finad
+        allmesses = self.get_all_user()
+        findescnames = ['countscore', 'numhomework', 'numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime']
+        alldatas = []
+        for allmess in allmesses:
+            for reqdata in reqdatas:
+                for rdataf in rdatafin:
+                    if reqdata["studentId"] == int(allmess["userid"]):
+                        allmess["hp"] = reqdata["hp"]
+                        allmess["credit"] = reqdata["credit"]
+                    if rdataf["userid"] == int(allmess["userid"]):
+                        allmess["countscore"] = rdataf["countscore"]
+                        allmess["numhomework"] = rdataf["numhomework"]
+                        allmess["numselfwork"] = rdataf["numselfwork"]
+                        allmess["topicnum"] = rdataf["topicnum"]
+                        allmess["countright"] = rdataf["countright"]
+                        allmess["rightlv"] = rdataf["rightlv"]
+                        allmess["counttime"] = rdataf["counttime"]
+            if len(allmess) == len(self.alldescs):
+                allmess["credit"] = allmess["hp"] = 0
+            if len(allmess) == len(self.alldescs) + 2:
+                for findena in findescnames:
+                    allmess[findena] = 0
+            alldatas.append(allmess)
+
+        return alldatas
 
     def main(self):
         Getstwinfo.checkschoolid(self)
