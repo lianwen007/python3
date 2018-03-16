@@ -1,9 +1,10 @@
+# 0316-实时数据接口重构，加入缓存机制
 # 0315-增加全量数据，接口调取时的内部计算，优化处理速度
 # 0313-日志结构变更，规范标题大小写
 # 0307-增加HP等字段的实时调用接口
 
 from flask import Blueprint, render_template, redirect,request
-from app import app
+from app import app,cache
 from .relog import log
 #from .models import Stwdaycount
 import json,time,requests,uuid
@@ -22,7 +23,6 @@ def get_stwinfo():
     classid = request.json.get('classid',0)
     gettype = request.json.get('gettype',0)
     # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
-    traceId = str(uuid.uuid1()).replace('-', '')
     if starttime is None or starttime == 0:
         starttime = int(time.time()) - 24*60*60*8
     if endedtime is None or endedtime == 0:
@@ -30,20 +30,19 @@ def get_stwinfo():
     if bookid is None or bookid == 0:
         bookid = '%'
     if gettype == 'getbookid':
-        s = Getbookid(schoolid,traceId)
+        s = Getbookid(schoolid)
     else:
-        s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid, traceId)
+        s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid)
     return json.dumps(s.main(), ensure_ascii=False)
 
 class Getstwinfo(object):
-    def __init__(self, schoolid, starttime, endedtime, bookid, classid, traceId):
+    def __init__(self, schoolid, starttime, endedtime, bookid, classid):
         self.schoolid = str(schoolid)
         self.starttime = starttime
         self.endedtime = endedtime
         self.bookid = bookid
         self.classid = classid
         self.checkscid = ''
-        self.traceId=traceId
         self.alldescs = ['userid', 'username', 'schoolid', 'classname']
 
     def checkschoolid(self):
@@ -72,6 +71,20 @@ class Getstwinfo(object):
         return messes
 
     def getkinginfo(self):
+        @cache.memoize(timeout=3000)
+        def get_live_hp(schoolIds, classIds):
+            # url = 'http://127.0.0.1:18889/student/studentInfo'
+            url = 'http://bigdata.yunzuoye.net/student/studentInfo'
+            if classIds is None or classIds == '' or classIds == 0:
+                getdata = {"schoolIds": schoolIds, "password": "king123456", }
+            else:
+                getdata = {"schoolIds": schoolIds, "password": "king123456", "classIds": classIds}
+            try:
+                reqdatas = requests.get(url, params=getdata, timeout=2).json()
+            except:
+                reqdatas = []
+            return reqdatas
+
         descnames = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'classid',
                      'bookname', 'bookid', 'hp', 'credit', 'countscore', 'numhomework', 'numselfwork',
                      'topicnum', 'countright', 'rightlv', 'counttime', 'datetime']
@@ -125,12 +138,7 @@ class Getstwinfo(object):
                             rdata[descnames[15]] = int((rdata[descnames[14]] / rdata[descnames[13]]) * 1000) / 10
                             rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
             rdatafin.append(rdata)
-        url = 'http://127.0.0.1:18889/student/studentInfo'
-        #url = 'http://bigdata.yunzuoye.net/student/studentInfo'
-        try:
-            reqdatas = requests.get(url, params=getdata).json()
-        except:
-            reqdatas=[]
+        reqdatas=get_live_hp(self.schoolid,self.classid)
         allmesses = self.get_all_user()
         findescnames = ['countscore', 'numhomework', 'numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime']
         alldatas = []
@@ -158,13 +166,13 @@ class Getstwinfo(object):
                 adatas["credit"] = adatas["hp"] = 0
             adatas['bookname'] = rdatafin[0]['bookname']
             lastdatas.append(adatas)
-
         return lastdatas
 
     def main(self):
         Getstwinfo.checkschoolid(self)
+        traceId=getTraceId()
         data = {}
-        data['traceId']= self.traceId
+        data['traceId']= traceId
         if self.checkscid == 'right':
             data['code'] = 200
             data['data'] = Getstwinfo.getkinginfo(self)
@@ -172,16 +180,15 @@ class Getstwinfo(object):
         else:
             data['code'] = 400
             data['msg'] = 'These schools is not exist!'
-        logInfo = str(data['code'])  + '[' + self.traceId + ']type[getStwinfo]' + 'scid[' + self.schoolid + ']'\
+        logInfo = str(data['code'])  + '[' + traceId + ']type[getStwinfo]' + 'scid[' + self.schoolid + ']'\
                   + 'sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']' + 'bkid[' +\
                 str(self.bookid) + ']' + 'clid[' + str(self.classid) + ']'
         log('APIRequest-', logInfo)
         return data
 
 class Getbookid(object):
-    def __init__(self, schoolid, traceId):
+    def __init__(self, schoolid):
         self.schoolid = schoolid
-        self.traceId = traceId
 
     def findallbookid(self):
         sqlsel = "select distinct bookname,bookid,subtype from product_stw_subject"
@@ -209,18 +216,22 @@ class Getbookid(object):
 
     def main(self):
         datav = Getbookid.findallbookid(self)
+        traceId=getTraceId()
         data = {}
-        data['traceId'] = self.traceId
+        data['traceId'] = traceId
         data['code'] = 200
         data['data'] = datav
         data['msg'] = 'successful!'
-        logInfo = str(data['code'])+'['+self.traceId + ']type[getBookid]' + 'scid[All]'
+        logInfo = str(data['code'])+'['+ traceId + ']type[getBookid]' + 'scid[All]'
         log('APIRequest-', logInfo)
         # log('logInfo:Getbookid - ', data['code'])
         return data
 
-
+def getTraceId():
+    return str(uuid.uuid1()).replace('-', '')
 
 @getStwInfo.route('/bigdata/product_stw/getid', methods=['GET'])
+@cache.cached(timeout=10,key_prefix='view_%s',unless=None)
 def getid():
+    print("cachetest")
     return 'test success'
