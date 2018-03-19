@@ -3,15 +3,19 @@
 # 0313-日志结构变更，规范标题大小写
 # 0307-增加HP等字段的实时调用接口
 
-from flask import Blueprint, render_template, redirect,request
+from flask import Blueprint, render_template, redirect,request,jsonify
 from app import app,cache
 from .relog import log
 #from .models import Stwdaycount
-import json,time,requests,uuid
+import json,time,requests
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
 
 getStwInfo = Blueprint('getStwInfo',__name__)
+
+def getTraceId():
+    import uuid
+    return str(uuid.uuid1()).replace('-', '')
 
 @getStwInfo.route('/bigdata/product_stw/getstwinfo', methods=['post'])  # 指定接口访问的路径，支持什么请求方式get，post
 def get_stwinfo():
@@ -33,7 +37,8 @@ def get_stwinfo():
         s = Getbookid(schoolid)
     else:
         s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid)
-    return json.dumps(s.main(), ensure_ascii=False)
+    return jsonify(s.main())
+        #json.dumps(s.main(), ensure_ascii=False)
 
 class Getstwinfo(object):
     def __init__(self, schoolid, starttime, endedtime, bookid, classid):
@@ -45,7 +50,8 @@ class Getstwinfo(object):
         self.checkscid = ''
         self.alldescs = ['userid', 'username', 'schoolid', 'classname']
 
-    def checkschoolid(self):
+    def checkschoolid(self): 
+        # 检查学校ID是否存在
         sql = "select distinct schoolid from product_stw_daycount where schoolid in (%s) \
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
         self.schoolid, self.starttime, self.endedtime)
@@ -53,7 +59,8 @@ class Getstwinfo(object):
         if len([chrs for chrs in rs ])>0:
             self.checkscid = 'right'
 
-    def get_all_user(self):
+    def get_all_user(self):  
+        # 获取学校或班级的所有学生列表
         alldescs=self.alldescs
         if self.classid is None or self.classid == '' or self.classid == 0:
             sqlsel = "select DISTINCT userid,username,schoolid,classname from teacher_student_info " \
@@ -71,10 +78,12 @@ class Getstwinfo(object):
         return messes
 
     def getkinginfo(self):
+        # 数据拉取的主函数
         @cache.memoize(timeout=3000)
         def get_live_hp(schoolIds, classIds):
-            # url = 'http://127.0.0.1:18889/student/studentInfo'
-            url = 'http://bigdata.yunzuoye.net/student/studentInfo'
+            # 调取业务实时数据接口，取得数据备用
+            url = 'http://127.0.0.1:18889/student/studentInfo'
+            # url = 'http://bigdata.yunzuoye.net/student/studentInfo'
             if classIds is None or classIds == '' or classIds == 0:
                 getdata = {"schoolIds": schoolIds, "password": "king123456", }
             else:
@@ -169,6 +178,7 @@ class Getstwinfo(object):
         return lastdatas
 
     def main(self):
+        #  判定有学校ID后，再执行数据拉取，并写入日志
         Getstwinfo.checkschoolid(self)
         traceId=getTraceId()
         data = {}
@@ -191,6 +201,7 @@ class Getbookid(object):
         self.schoolid = schoolid
 
     def findallbookid(self):
+        # 获取所有书本ID对应书名
         sqlsel = "select distinct bookname,bookid,subtype from product_stw_subject"
         descnames = ['bookname', 'bookid','subtype']
         data_list  = db.session.execute(sqlsel)
@@ -202,6 +213,7 @@ class Getbookid(object):
             messes.append(mess)
         return messes
     def findbookidbysc(self):
+        # 根据学校ID获取书本ID和对应书名，已暂停使用
         sqlsel = "select distinct bookname,bookid from product_stw_daycount where schoolid in (%s)" % (
             self.schoolid)
         descnames = ['bookname', 'bookid']
@@ -227,11 +239,9 @@ class Getbookid(object):
         # log('logInfo:Getbookid - ', data['code'])
         return data
 
-def getTraceId():
-    return str(uuid.uuid1()).replace('-', '')
 
 @getStwInfo.route('/bigdata/product_stw/getid', methods=['GET'])
 @cache.cached(timeout=10,key_prefix='view_%s',unless=None)
 def getid():
     print("cachetest")
-    return 'test success'
+    return jsonify({'test success':1131231})
