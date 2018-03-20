@@ -1,3 +1,4 @@
+# 0320-新增获取学生基础信息统计接口。METHOD方法判定
 # 0316-实时数据接口重构，加入缓存机制
 # 0315-增加全量数据，接口调取时的内部计算，优化处理速度
 # 0313-日志结构变更，规范标题大小写
@@ -17,16 +18,22 @@ def getTraceId():
     import uuid
     return str(uuid.uuid1()).replace('-', '')
 
-@getStwInfo.route('/bigdata/product_stw/getstwinfo', methods=['post'])  # 指定接口访问的路径，支持什么请求方式get，post
+@getStwInfo.route('/bigdata/product_stw/getstwinfo', methods=['POST','GET'])  # 指定接口访问的路径，支持什么请求方式get，post
 def get_stwinfo():
-    # userid = request.args.get('userid') #使用request.args.get方式获取拼接的入参数据
-    schoolid = request.json.get('schoolid')  # 获取带json串请求的userid参数传入的值
-    starttime = request.json.get('starttime')
-    endedtime = request.json.get('endedtime')
-    bookid = request.json.get('bookid',0)
-    classid = request.json.get('classid',0)
-    gettype = request.json.get('gettype',0)
+    if request.method=='POST':
+        # userid = request.args.get('userid') #使用request.args.get方式获取拼接的入参数据
+        schoolid = request.json.get('schoolid')  # 获取带json串请求的userid参数传入的值
+        starttime = request.json.get('starttime')
+        endedtime = request.json.get('endedtime')
+        bookid = request.json.get('bookid',0)
+        classid = request.json.get('classid',0)
+        gettype = request.json.get('gettype',0)
+        subjectid = request.json.get('subjectid')
     # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
+    if request.method=='GET':
+        return jsonify({'Msg':"Error.You should change the Method to 'Post' please!",
+                        'Code':405,
+                        })
     if starttime is None or starttime == 0:
         starttime = int(time.time()) - 24*60*60*8
     if endedtime is None or endedtime == 0:
@@ -35,6 +42,8 @@ def get_stwinfo():
         bookid = '%'
     if gettype == 'getbookid':
         s = Getbookid(schoolid)
+    elif gettype == 'getstudent':
+        s=GetstwStudent(schoolid,starttime,endedtime,subjectid,classid)
     else:
         s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid)
     return jsonify(s.main())
@@ -50,7 +59,7 @@ class Getstwinfo(object):
         self.checkscid = ''
         self.alldescs = ['userid', 'username', 'schoolid', 'classname']
 
-    def checkschoolid(self): 
+    def checkschoolid(self):
         # 检查学校ID是否存在
         sql = "select distinct schoolid from product_stw_daycount where schoolid in (%s) \
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
@@ -59,7 +68,7 @@ class Getstwinfo(object):
         if len([chrs for chrs in rs ])>0:
             self.checkscid = 'right'
 
-    def get_all_user(self):  
+    def get_all_user(self):
         # 获取学校或班级的所有学生列表
         alldescs=self.alldescs
         if self.classid is None or self.classid == '' or self.classid == 0:
@@ -81,7 +90,7 @@ class Getstwinfo(object):
         # 数据拉取的主函数
         @cache.memoize(timeout=3000)
         def get_live_hp(schoolIds, classIds):
-            # 调取业务实时数据接口，取得数据备用
+            # 调取业务实时数据接口，取得数据
             url = 'http://127.0.0.1:18889/student/studentInfo'
             # url = 'http://bigdata.yunzuoye.net/student/studentInfo'
             if classIds is None or classIds == '' or classIds == 0:
@@ -239,6 +248,50 @@ class Getbookid(object):
         # log('logInfo:Getbookid - ', data['code'])
         return data
 
+class GetstwStudent(object):
+    def __init__(self,schoolid, starttime, endedtime, subjectid , classid):
+        self.schoolid = str(schoolid)
+        self.starttime = starttime
+        self.endedtime = endedtime
+        self.subjectid = subjectid
+        self.classid = classid
+
+    def getstwstudent(self):
+        descnames=['userid','username','topicnum','rightnum']
+        sql="SELECT userid,username,SUM(topicnum)AS `topicnum`,sum(countright)AS rightnum FROM product_stw_subcount WHERE classid = %s " \
+            "AND subjectid = %s AND unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s GROUP BY userid,username"\
+            %(self.classid,self.subjectid,self.starttime,self.endedtime)
+        data_list = db.session.execute(sql)
+        messes, mesind, finad = [], [], []
+        for datas in data_list:
+            mess = {}
+            for x in range(len(datas)):
+                mess[descnames[x]] = datas[x]
+            mess['rightrate']=int((mess['rightnum']/mess['topicnum'])*10000)/100
+            messes.append(mess)
+        return messes
+
+    def main(self):
+        traceId = getTraceId()
+        if self.classid and self.subjectid:
+            datav=self.getstwstudent()
+            codenum=200
+            messa='successful!'
+            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]'  + 'scid['+ str(self.schoolid)+ ']classid['+ str(self.classid) +\
+                      ']subjectid['+ str(self.subjectid) + ']sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
+        else:
+            datav = 'No data!'
+            codenum = 400
+            messa = 'Classid or Subjectid is not exist!'
+            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
+        data = {}
+        data['traceId'] = traceId
+        data['code'] = codenum
+        data['data'] = datav
+        data['msg'] = messa
+        log('APIRequest-', logInfo)
+        # log('logInfo:Getbookid - ', data['code'])
+        return data
 
 @getStwInfo.route('/bigdata/product_stw/getid', methods=['GET'])
 @cache.cached(timeout=10,key_prefix='view_%s',unless=None)
