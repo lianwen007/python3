@@ -1,9 +1,3 @@
-# 0320-新增获取学生基础信息统计接口。METHOD方法判定
-# 0316-实时数据接口重构，加入缓存机制
-# 0315-增加全量数据，接口调取时的内部计算，优化处理速度
-# 0313-日志结构变更，规范标题大小写
-# 0307-增加HP等字段的实时调用接口
-
 from flask import Blueprint, render_template, redirect,request,jsonify
 from app import app,cache
 from .relog import log
@@ -28,7 +22,7 @@ def get_stwinfo():
         bookid = request.json.get('bookid',0)
         classid = request.json.get('classid',0)
         gettype = request.json.get('gettype',0)
-        subjectid = request.json.get('subjectid')
+        subjectname = request.json.get('subjectname')
     # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
     if request.method=='GET':
         return jsonify({'Msg':"Error.You should change the Method to 'Post' please!",
@@ -43,7 +37,7 @@ def get_stwinfo():
     if gettype == 'getbookid':
         s = Getbookid(schoolid)
     elif gettype == 'getstudent':
-        s=GetstwStudent(schoolid,starttime,endedtime,subjectid,classid)
+        s=GetstwStudent(schoolid,starttime,endedtime,subjectname,classid)
     else:
         s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid)
     return jsonify(s.main())
@@ -249,11 +243,12 @@ class Getbookid(object):
         return data
 
 class GetstwStudent(object):
-    def __init__(self,schoolid, starttime, endedtime, subjectid , classid):
+    def __init__(self,schoolid, starttime, endedtime, subjectname , classid):
+        subpart={"语文":1,"数学":2,"英语":3,"科学":4,"历史":5,"道德与法治":6,"物理":7,}
         self.schoolid = str(schoolid)
         self.starttime = starttime
         self.endedtime = endedtime
-        self.subjectid = subjectid
+        self.subjectid = subpart.get(subjectname)
         self.classid = classid
 
     def getstwstudent(self):
@@ -262,7 +257,7 @@ class GetstwStudent(object):
             "AND subjectid = %s AND unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s GROUP BY userid,username"\
             %(self.classid,self.subjectid,self.starttime,self.endedtime)
         data_list = db.session.execute(sql)
-        messes, mesind, finad = [], [], []
+        messes = []
         for datas in data_list:
             mess = {}
             for x in range(len(datas)):
@@ -273,16 +268,21 @@ class GetstwStudent(object):
 
     def main(self):
         traceId = getTraceId()
-        if self.classid and self.subjectid:
+        if self.classid and self.schoolid and self.subjectid:
             datav=self.getstwstudent()
             codenum=200
             messa='successful!'
             logInfo = str(codenum) + '[' + traceId + ']type[getStudent]'  + 'scid['+ str(self.schoolid)+ ']classid['+ str(self.classid) +\
                       ']subjectid['+ str(self.subjectid) + ']sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
-        else:
+        elif not self.classid or not self.schoolid:
             datav = 'No data!'
             codenum = 400
-            messa = 'Classid or Subjectid is not exist!'
+            messa = 'Classid or schoolid is not exist!'
+            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
+        elif not self.subjectid:
+            datav = 'No data!'
+            codenum = 400
+            messa = 'SubjectName is not exist!'
             logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
         data = {}
         data['traceId'] = traceId
