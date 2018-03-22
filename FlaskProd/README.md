@@ -1,6 +1,6 @@
 # API For Product
 
-### app.getStwInfo - 刷题王3统计信息接口
+### app.getStwInfo - 刷题王3统计信息接口 API for king3 count info
 ##### Update Info:
 0322-学生信息接口更新，入参修改SubID为SubjectName </br>
 0320-新增获取学生基础信息统计接口。METHOD方法判定</br>
