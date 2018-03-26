@@ -17,23 +17,16 @@ def get_stwinfo():
     if request.method=='POST':
         # userid = request.args.get('userid') #使用request.args.get方式获取拼接的入参数据
         schoolid = request.json.get('schoolid')  # 获取带json串请求的userid参数传入的值
-        starttime = request.json.get('starttime')
-        endedtime = request.json.get('endedtime')
-        bookid = request.json.get('bookid',0)
+        starttime = request.json.get('starttime', int(time.time()) - 24*60*60*8)
+        endedtime = request.json.get('endedtime', int(time.time()))
+        bookid = request.json.get('bookid','%')
         classid = request.json.get('classid',0)
         gettype = request.json.get('gettype',0)
-        subjectname = request.json.get('subjectname')
+        subjectname = request.json.get('subjectname','subname')
     # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
     if request.method=='GET':
         return jsonify({'Msg':"Error.You should change the Method to 'Post' please!",
-                        'Code':405,
-                        })
-    if starttime is None or starttime == 0:
-        starttime = int(time.time()) - 24*60*60*8
-    if endedtime is None or endedtime == 0:
-        endedtime = int(time.time())
-    if bookid is None or bookid == 0:
-        bookid = '%'
+                        'Code':405,})
     if gettype == 'getbookid':
         s = Getbookid(schoolid)
     elif gettype == 'getstudent':
@@ -245,13 +238,39 @@ class Getbookid(object):
 class GetstwStudent(object):
     def __init__(self,schoolid, starttime, endedtime, subjectname , classid):
         subpart={"语文":1,"数学":2,"英语":3,"科学":4,"历史":5,"道德与法治":6,"物理":7,}
+        self.subjectname=subjectname
         self.schoolid = str(schoolid)
         self.starttime = starttime
         self.endedtime = endedtime
-        self.subjectid = subpart.get(subjectname)
+        self.subjectid = subpart.get(self.subjectname)
         self.classid = classid
+        self.checkclid=''
+        self.alldescs=['userid','username']
+
+    def checkclassid(self):
+        # 检查学校ID是否存在
+        sql = "select distinct classid from product_stw_daycount where classid in (%s) \
+                and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
+        self.classid, self.starttime, self.endedtime)
+        rs = db.session.execute(sql)
+        if len([chrs for chrs in rs ])>0:
+            self.checkclid = 'right'
 
     def getstwstudent(self):
+        @cache.memoize(timeout=3600*12)
+        def get_all_user(classid,alldescs):
+            # 获取班级的所有学生列表
+            sqlsel = "select DISTINCT userid,username from teacher_student_info  " \
+                     "where classname!='教师' AND classid in (%s)" % (classid)
+            data_lists = db.session.execute(sqlsel)
+            messes = []
+            for datas in data_lists:
+                mess = {}
+                for x in range(len(datas)):
+                    mess[alldescs[x]] = datas[x]
+                messes.append(mess)
+            return messes
+
         descnames=['userid','username','topicnum','rightnum']
         sql="SELECT userid,username,SUM(topicnum)AS `topicnum`,sum(countright)AS rightnum FROM product_stw_subcount WHERE classid = %s " \
             "AND subjectid = %s AND unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s GROUP BY userid,username"\
@@ -264,26 +283,47 @@ class GetstwStudent(object):
                 mess[descnames[x]] = datas[x]
             mess['rightrate']=int((mess['rightnum']/mess['topicnum'])*10000)/100
             messes.append(mess)
-        return messes
+        allmesses = get_all_user(self.classid,self.alldescs)
+        findescnames = ['userid', 'username', 'topicnum', 'rightnum', 'rightrate']
+        alldatas = []
+        for allmess in allmesses:
+            for rdataf in messes:
+                if rdataf["userid"] == int(allmess["userid"]):
+                    allmess["username"] = rdataf["username"]
+                    allmess["topicnum"] = rdataf["topicnum"]
+                    allmess["rightnum"] = rdataf["rightnum"]
+                    allmess["rightrate"] = rdataf["rightrate"]
+            if len(allmess) == len(self.alldescs):
+                allmess["topicnum"]=allmess["rightnum"]=allmess["rightrate"]=0
+                # for findena in findescnames:
+                #     allmess[findena] = 0
+            alldatas.append(allmess)
+        return alldatas
 
     def main(self):
+        self.checkclassid()
         traceId = getTraceId()
         if self.classid and self.schoolid and self.subjectid:
-            datav=self.getstwstudent()
-            codenum=200
-            messa='successful!'
+            if self.checkclid == 'right':
+                datav=self.getstwstudent()
+                codenum=200
+                messa='successful!'
+            else:
+                datav = 'No data!'
+                codenum = 400
+                messa = 'Error, Classid not exists!'
             logInfo = str(codenum) + '[' + traceId + ']type[getStudent]'  + 'scid['+ str(self.schoolid)+ ']classid['+ str(self.classid) +\
                       ']subjectid['+ str(self.subjectid) + ']sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
         elif not self.classid or not self.schoolid:
             datav = 'No data!'
             codenum = 400
-            messa = 'Classid or schoolid is not exist!'
-            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
+            messa = 'Classid or schoolid not exists!'
+            logInfo = str(codenum) +'['+ traceId + ']type[getStudent]subname['+ str(self.subjectname) + ']sttime['+ str(self.starttime) +']'+ 'endtime['+ str(self.endedtime) + ']'
         elif not self.subjectid:
             datav = 'No data!'
             codenum = 400
-            messa = 'SubjectName is not exist!'
-            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
+            messa = 'SubjectName not exists!'
+            logInfo = str(codenum) +'['+traceId + ']type[getStudent]subname['+ str(self.subjectname) + ']sttime['+ str(self.starttime) +']'+ 'endtime['+ str(self.endedtime) + ']'
         data = {}
         data['traceId'] = traceId
         data['code'] = codenum
