@@ -25,12 +25,11 @@ def get_stwinfo():
         subjectname = request.json.get('subjectname','subname')
     # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
     if request.method=='GET':
-        return jsonify({'Msg':"Error.You should change the Method to 'Post' please!",
-                        'Code':405,})
+        return jsonify({'Msg':"Error.You should change the Method to 'Post' please!",'Code':405,})
     if gettype == 'getbookid':
         s = Getbookid(schoolid)
     elif gettype == 'getstudent':
-        s=GetstwStudent(schoolid,starttime,endedtime,subjectname,classid)
+        s = GetstwStudent(schoolid, starttime, endedtime, subjectname, classid)
     else:
         s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid)
     return jsonify(s.main())
@@ -44,6 +43,7 @@ class Getstwinfo(object):
         self.bookid = bookid
         self.classid = classid
         self.checkscid = ''
+        self.checkBookid=''
         self.alldescs = ['userid', 'username', 'schoolid', 'classname']
 
     def checkschoolid(self):
@@ -54,6 +54,15 @@ class Getstwinfo(object):
         rs = db.session.execute(sql)
         if len([chrs for chrs in rs ])>0:
             self.checkscid = 'right'
+
+    def checkbookid(self):
+        # 检查书本ID是否存在
+        sql = "select distinct schoolid from product_stw_daycount where schoolid in (%s) and bookid in ('%s') \
+                and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
+            self.schoolid,self.bookid, self.starttime, self.endedtime)
+        rs = db.session.execute(sql)
+        if len([chrs for chrs in rs ])>0:
+            self.checkBookid = 'right'
 
     def get_all_user(self):
         # 获取学校或班级的所有学生列表
@@ -72,6 +81,16 @@ class Getstwinfo(object):
                 mess[alldescs[x]] = datas[x]
             messes.append(mess)
         return messes
+
+    def get_subType(self):
+        self.checkBookid
+        if self.checkBookid == 'right':
+            sqlsel = "select DISTINCT subtype from product_stw_subject WHERE bookid in ('%s')" % (self.bookid)
+            data_list = db.session.execute(sqlsel)
+            datas = [x for x in data_list][0][0]
+            return datas
+        else:
+            return 0
 
     def getkinginfo(self):
         # 数据拉取的主函数
@@ -98,13 +117,11 @@ class Getstwinfo(object):
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s) \
                 and bookid like '%s' order by `datetime` DESC " % (
             self.schoolid, self.starttime, self.endedtime, self.bookid)
-            getdata = {"schoolIds": self.schoolid, "password": "king123456", }
         else:
             sqlsel = "select * from product_stw_daycount where schoolid in (%s) \
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s) \
                 and classid in (%s) and bookid like '%s' order by `datetime` DESC " % (
             self.schoolid, self.starttime, self.endedtime, self.classid, self.bookid)
-            getdata = {"schoolIds": self.schoolid, "classIds": self.classid, "password": "king123456", }
         data_list  = db.session.execute(sqlsel)
         messes, mesind, finad = [], [], []
         for datas in data_list:
@@ -124,25 +141,47 @@ class Getstwinfo(object):
             # findata.append(dataz)
             finad.append(dataz)
         rdatafin = []
-        for dataf in finad:
-            rdata = {}
-            num = [0, 0, 0, 0, 0, 0]
-            for z in range(len(dataf)):
-                for i in range(len(dataf[z])):
-                    if i <= 10:
-                        rdata[descnames[i]] = dataf[0][descnames[i]]
-                    elif i <= 16:
-                        if dataf[z][descnames[i]] == None:
-                            dataf[z][descnames[i]] = 0
-                        num[i - 11] += dataf[z][descnames[i]]
-                        rdata[descnames[i]] = num[i - 11]
-                    else:
-                        if rdata[descnames[13]] == 0:
-                            rdata[descnames[15]] = rdata[descnames[16]] = 0
+        if self.get_subType() == 1:
+            for dataf in finad:
+                rdata = {}
+                num = [0, 0, 0, 0, 0, 0]
+                for z in range(len(dataf)):
+                    for i in range(len(dataf[z])):
+                        if i <= 10:
+                            rdata[descnames[i]] = dataf[0][descnames[i]]
+                        elif i <= 16:
+                            if dataf[z][descnames[i]] == None:
+                                dataf[z][descnames[i]] = 0
+                            num[i - 11] += dataf[z][descnames[i]]
+                            rdata[descnames[i]] = num[i - 11]
                         else:
-                            rdata[descnames[15]] = int((rdata[descnames[14]] / rdata[descnames[13]]) * 1000) / 10
-                            rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
-            rdatafin.append(rdata)
+                            if rdata[descnames[13]] == 0:
+                                rdata[descnames[15]] = rdata[descnames[16]] = 0
+                            else:
+                                rdata[descnames[15]] = int((rdata[descnames[14]] / rdata[descnames[13]]) * 1000) / 10
+                                rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
+                rdatafin.append(rdata)
+        elif self.get_subType() == 2:
+            for dataf in finad:
+                rdata = {}
+                num = [0, 0, 0, 0, 0, 0]
+                for z in range(len(dataf)):
+                    for i in range(len(dataf[z])):
+                        if i <= 10:
+                            rdata[descnames[i]] = dataf[0][descnames[i]]
+                        elif i <= 16:
+                            if dataf[z][descnames[i]] == None:
+                                dataf[z][descnames[i]] = 0
+                            num[i - 11] += dataf[z][descnames[i]]
+                            rdata[descnames[i]] = num[i - 11]
+                        else:
+                            if rdata[descnames[13]] == 0:
+                                rdata[descnames[15]] = rdata[descnames[16]] = 0
+                            else:
+                                rdata[descnames[13]] = rdata[descnames[13]]/10
+                                rdata[descnames[15]] = int((rdata[descnames[15]] / len(dataf)) * 100) / 100
+                                rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
+                rdatafin.append(rdata)
         reqdatas=get_live_hp(self.schoolid,self.classid)
         allmesses = self.get_all_user()
         findescnames = ['countscore', 'numhomework', 'numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime']
@@ -174,18 +213,19 @@ class Getstwinfo(object):
         return lastdatas
 
     def main(self):
-        #  判定有学校ID后，再执行数据拉取，并写入日志
-        Getstwinfo.checkschoolid(self)
+        #  判定有学校ID和对应的书本id后，再执行数据拉取，并写入日志
+        self.checkschoolid()
+        self.checkbookid()
         traceId=getTraceId()
         data = {}
         data['traceId']= traceId
-        if self.checkscid == 'right':
+        if self.checkscid == 'right' and self.checkBookid == 'right':
             data['code'] = 200
             data['data'] = Getstwinfo.getkinginfo(self)
-            data['msg'] = 'successful!'
+            data['msg'] = 'Successful!'
         else:
             data['code'] = 400
-            data['msg'] = 'These schools is not exist!'
+            data['msg'] = 'These schools or books are not exist!'
         logInfo = str(data['code'])  + '[' + traceId + ']type[getStwinfo]' + 'scid[' + self.schoolid + ']'\
                   + 'sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']' + 'bkid[' +\
                 str(self.bookid) + ']' + 'clid[' + str(self.classid) + ']'
