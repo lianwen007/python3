@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect,request,jsonify
-from app import app
+from app import app,cache
 from .relog import log
 #from .models import Stwdaycount
 import json,time,requests
@@ -17,8 +17,9 @@ def get_kpiinfo(subjectId):
     starttime = request.values.get('startTime', int(time.time()) - 24*60*60*8)
     endedtime = request.values.get('endTime', int(time.time()))
     if not schoolid:
-        mess ={'code':400,'mess': 'Error! Please enter the correct schoolId!',}
-        logInfo = '400' + '[' + getTraceId() + ']type[getKpiInfo]' + 'scid[Noid]subjectid[' \
+        traceid=getTraceId()
+        mess ={'code':400,'msg': 'Error! Please enter the correct schoolId!','traceId':traceid}
+        logInfo = '400' + '[' + traceid + ']type[getKpiInfo]' + 'scid[Noid]subjectid[' \
                   + str(subjectId) + ']sttime[' + str(starttime) + ']endtime[' + str(endedtime) + ']'
         log('APIRequest-', logInfo)
         return jsonify(mess)
@@ -43,6 +44,18 @@ class Getkpiinfo(object):
             self.checkscid = 'right'
 
     def getkpiinfo(self):
+        @cache.memoize(timeout=3600*12)
+        def get_teacher_subject(schoolId, subjectId):
+            # 调取业务实时数据接口，取得数据
+            url = 'http://admin.yunzuoye.net/api/user/subjectTch'
+            # url = 'http://bigdata.yunzuoye.net/student/studentInfo'
+            getdata = {"schoolId": schoolId, "subjectId": subjectId, }
+            try:
+                reqdatas = requests.get(url, params=getdata, timeout=2).json()
+            except:
+                reqdatas = []
+            return reqdatas
+
         descnames = ['tchId', 'tchName', 'classId', 'className', 'stuNum', 'practiceNum', 'taskFixNum', 'taskStuNum', 'taskUploadNum']
         sqlsel = "SELECT teacherid,teachername,classid,classname,studentnum,CAST(SUM(practicenum)AS SIGNED) practiceNum,CAST(SUM(taskfixnum)AS SIGNED)taskFixNum,\
             CAST(SUM(taskstunum)AS SIGNED)taskStuNum,CAST(SUM(taskupnum)AS SIGNED)taskUploadNum FROM product_stw_kpicount WHERE schoolid=%s \
@@ -50,12 +63,21 @@ class Getkpiinfo(object):
             GROUP BY teacherid,teachername,classid,classname,studentnum" % (self.schoolid, self.subjectid, self.starttime, self.endedtime)
         data_list = db.session.execute(sqlsel)
         messes = []
+        reqteachers = get_teacher_subject(self.schoolid, self.subjectid)
         for datas in data_list:
             mess = {}
             for x in range(len(datas)):
                 mess[descnames[x]] = datas[x]
             messes.append(mess)
-        return messes
+        finalData = []
+        if reqteachers:
+            for messfin in messes:
+                for reqteacher in reqteachers:
+                    if str(messfin['tchId']) == str(reqteacher['userId']):
+                        finalData.append(messfin)
+        else:
+            finalData = messes
+        return finalData
 
     def main(self):
         data = {}
