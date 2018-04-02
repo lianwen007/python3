@@ -1,7 +1,14 @@
 # API For Product
 
+### app.getEnStwInfo - 英语刷题王3统计接口 API for count info of Englishking3
+### app.getKpiInfo - 考核统计信息接口 API for count info of kpis
 ### app.getStwInfo - 刷题王3统计信息接口 API for count info of king3 
-#### Update Info:
+
+#### Update Info app.getStwInfo:
+##### **2018-04-02**
+> * 加入缓存清除，接口调取可清除历史缓存
+> * 内部调取学科信息接口
+> * 增加判定，只返回学科下所有教师
 
 ##### **2018-03-28**
 > * 增加SubTpye判定，不同规则执行不同算法
@@ -23,3 +30,9 @@
 
 ##### **2018-03-07**
 > * 增加HP等字段的实时调用接口 
+
+
+#### Update Info app.getEnStwInfo:
+##### **2018-04-02**
+> * 新增英刷数据接口
+> * 学生信息获取全部，无数据填充0
