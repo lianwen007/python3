@@ -6,15 +6,15 @@ import json,time,requests
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
 
-getStwInfo = Blueprint('getStwInfo',__name__)
+getStwInfo = Blueprint('getStwInfo', __name__)
 
 def getTraceId():
-    import uuid
-    return str(uuid.uuid1()).replace('-', '')
+  import uuid
+  return str(uuid.uuid1()).replace('-', '')
 
 @getStwInfo.route('/bigdata/product_stw/getstwinfo', methods=['POST','GET'])  # 指定接口访问的路径，支持什么请求方式get，post
 def get_stwinfo():
-    if request.method=='POST':
+    if request.method == 'POST':
         # userid = request.args.get('userid') #使用request.args.get方式获取拼接的入参数据
         schoolid = request.json.get('schoolid')  # 获取带json串请求的userid参数传入的值
         starttime = request.json.get('starttime', int(time.time()) - 24*60*60*8)
@@ -24,8 +24,8 @@ def get_stwinfo():
         gettype = request.json.get('gettype',0)
         subjectname = request.json.get('subjectname','subname')
     # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
-    if request.method=='GET':
-        return jsonify({'Msg':"Error.You should change the Method to 'Post' please!",'Code':405,})
+    if request.method == 'GET':
+        return jsonify({'Msg': "Error.You should change the Method to 'Post'!", 'Code': 405, })
     if gettype == 'getbookid':
         s = Getbookid(schoolid)
     elif gettype == 'getstudent':
@@ -34,6 +34,16 @@ def get_stwinfo():
         s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid)
     return jsonify(s.main())
         #json.dumps(s.main(), ensure_ascii=False)
+
+@getStwInfo.route('/bigdata/product_stw/stwInfoHp/clearCache', methods=['GET'])
+def stwcache_clear():
+    password = request.values.get('password')
+    if password == 'bigdata123':
+        cache.clear()
+        datas = {'msg': 'Successful! Clear All'}
+    else:
+        datas = {'msg': 'Error, Password was wrong!'}
+    return jsonify(datas)
 
 class Getstwinfo(object):
     def __init__(self, schoolid, starttime, endedtime, bookid, classid):
@@ -67,7 +77,7 @@ class Getstwinfo(object):
     def get_all_user(self):
         # 获取学校或班级的所有学生列表
         alldescs=self.alldescs
-        if self.classid is None or self.classid == '' or self.classid == 0:
+        if not self.classid or self.classid == '' or self.classid == 0:
             sqlsel = "select DISTINCT userid,username,schoolid,classname from teacher_student_info " \
                      "where classname!='教师' AND schoolid in (%s)" % (self.schoolid)
         else:
@@ -107,6 +117,7 @@ class Getstwinfo(object):
                 reqdatas = requests.get(url, params=getdata, timeout=2).json()
             except:
                 reqdatas = []
+                cache.delete_memoized('get_live_hp', schoolIds, classIds)
             return reqdatas
 
         descnames = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'classid',
@@ -122,7 +133,7 @@ class Getstwinfo(object):
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s) \
                 and classid in (%s) and bookid like '%s' order by `datetime` DESC " % (
             self.schoolid, self.starttime, self.endedtime, self.classid, self.bookid)
-        data_list  = db.session.execute(sqlsel)
+        data_list = db.session.execute(sqlsel)
         messes, mesind, finad = [], [], []
         for datas in data_list:
             mess = {}
@@ -278,14 +289,14 @@ class Getbookid(object):
 class GetstwStudent(object):
     def __init__(self,schoolid, starttime, endedtime, subjectname , classid):
         subpart={"语文":1,"数学":2,"英语":3,"科学":4,"历史":5,"道德与法治":6,"物理":7,}
-        self.subjectname=subjectname
+        self.subjectname = subjectname
         self.schoolid = str(schoolid)
         self.starttime = starttime
         self.endedtime = endedtime
         self.subjectid = subpart.get(self.subjectname)
         self.classid = classid
-        self.checkclid=''
-        self.alldescs=['userid','username']
+        self.checkclid = ''
+        self.alldescs = ['userid','username']
 
     def checkclassid(self):
         # 检查学校ID是否存在
@@ -345,9 +356,9 @@ class GetstwStudent(object):
         traceId = getTraceId()
         if self.classid and self.schoolid and self.subjectid:
             if self.checkclid == 'right':
-                datav=self.getstwstudent()
-                codenum=200
-                messa='successful!'
+                datav = self.getstwstudent()
+                codenum = 200
+                messa = 'successful!'
             else:
                 datav = 'No data!'
                 codenum = 400
@@ -377,4 +388,4 @@ class GetstwStudent(object):
 @cache.cached(timeout=10,key_prefix='view_%s',unless=None)
 def getid():
     print("cachetest")
-    return jsonify({'test success':1131231})
+    return jsonify({'test success': 1131231})
