@@ -3,6 +3,7 @@
 ### app.getEnStwInfo - 英语刷题王3统计接口 API for count info of Englishking3
 ### app.getKpiInfo - 考核统计信息接口 API for count info of kpis
 ### app.getStwInfo - 刷题王3统计信息接口 API for count info of king3 
+</br>
 
 #### Update Info app.getStwInfo:
 ##### **2018-04-02**
