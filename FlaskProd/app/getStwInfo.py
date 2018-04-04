@@ -6,15 +6,15 @@ import json,time,requests
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
 
-getStwInfo = Blueprint('getStwInfo', __name__)
+getStwInfo = Blueprint('getStwInfo',__name__)
 
 def getTraceId():
-  import uuid
-  return str(uuid.uuid1()).replace('-', '')
+    import uuid
+    return str(uuid.uuid1()).replace('-', '')
 
-@getStwInfo.route('/bigdata/product_stw/getstwinfo', methods=['POST','GET'])  # 指定接口访问的路径，支持什么请求方式get，post
+@getStwInfo.route('/getstwinfo', methods=['POST','GET'])  # 指定接口访问的路径，支持什么请求方式get，post
 def get_stwinfo():
-    if request.method == 'POST':
+    if request.method=='POST':
         # userid = request.args.get('userid') #使用request.args.get方式获取拼接的入参数据
         schoolid = request.json.get('schoolid')  # 获取带json串请求的userid参数传入的值
         starttime = request.json.get('starttime', int(time.time()) - 24*60*60*8)
@@ -24,8 +24,8 @@ def get_stwinfo():
         gettype = request.json.get('gettype',0)
         subjectname = request.json.get('subjectname','subname')
     # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
-    if request.method == 'GET':
-        return jsonify({'Msg': "Error.You should change the Method to 'Post'!", 'Code': 405, })
+    if request.method=='GET':
+        return jsonify({'Msg':"Error.You should change the Method to 'Post'!",'Code':405,})
     if gettype == 'getbookid':
         s = Getbookid(schoolid)
     elif gettype == 'getstudent':
@@ -35,14 +35,14 @@ def get_stwinfo():
     return jsonify(s.main())
         #json.dumps(s.main(), ensure_ascii=False)
 
-@getStwInfo.route('/bigdata/product_stw/stwInfoHp/clearCache', methods=['GET'])
+@getStwInfo.route('/stwInfoHp/clearCache', methods=['GET'])
 def stwcache_clear():
     password = request.values.get('password')
     if password == 'bigdata123':
         cache.clear()
-        datas = {'msg': 'Successful! Clear All'}
+        datas = {'msg':'Successful! Clear All'}
     else:
-        datas = {'msg': 'Error, Password was wrong!'}
+        datas = {'msg':'Error, Password was wrong!'}
     return jsonify(datas)
 
 class Getstwinfo(object):
@@ -77,7 +77,7 @@ class Getstwinfo(object):
     def get_all_user(self):
         # 获取学校或班级的所有学生列表
         alldescs=self.alldescs
-        if not self.classid or self.classid == '' or self.classid == 0:
+        if self.classid is None or self.classid == '' or self.classid == 0:
             sqlsel = "select DISTINCT userid,username,schoolid,classname from teacher_student_info " \
                      "where classname!='教师' AND schoolid in (%s)" % (self.schoolid)
         else:
@@ -117,7 +117,7 @@ class Getstwinfo(object):
                 reqdatas = requests.get(url, params=getdata, timeout=2).json()
             except:
                 reqdatas = []
-                cache.delete_memoized('get_live_hp', schoolIds, classIds)
+                #cache.delete_memoized('get_live_hp', schoolIds, classIds)
             return reqdatas
 
         descnames = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'classid',
@@ -133,7 +133,7 @@ class Getstwinfo(object):
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s) \
                 and classid in (%s) and bookid like '%s' order by `datetime` DESC " % (
             self.schoolid, self.starttime, self.endedtime, self.classid, self.bookid)
-        data_list = db.session.execute(sqlsel)
+        data_list  = db.session.execute(sqlsel)
         messes, mesind, finad = [], [], []
         for datas in data_list:
             mess = {}
@@ -171,6 +171,7 @@ class Getstwinfo(object):
                             else:
                                 rdata[descnames[15]] = int((rdata[descnames[14]] / rdata[descnames[13]]) * 1000) / 10
                                 rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
+                # rdata['topicOld'] = (rdata[descnames[11]] + rdata[descnames[12]])*10
                 rdatafin.append(rdata)
         elif self.get_subType() == 2:
             for dataf in finad:
@@ -210,6 +211,7 @@ class Getstwinfo(object):
             if len(allmess) == len(self.alldescs):
                 for findena in findescnames:
                     allmess[findena] = 0
+            allmess['topicold'] = (allmess[descnames[11]] + allmess[descnames[12]])*10
             alldatas.append(allmess)
         lastdatas = []
         for adatas in alldatas:
@@ -289,14 +291,14 @@ class Getbookid(object):
 class GetstwStudent(object):
     def __init__(self,schoolid, starttime, endedtime, subjectname , classid):
         subpart={"语文":1,"数学":2,"英语":3,"科学":4,"历史":5,"道德与法治":6,"物理":7,}
-        self.subjectname = subjectname
+        self.subjectname=subjectname
         self.schoolid = str(schoolid)
         self.starttime = starttime
         self.endedtime = endedtime
         self.subjectid = subpart.get(self.subjectname)
         self.classid = classid
-        self.checkclid = ''
-        self.alldescs = ['userid','username']
+        self.checkclid=''
+        self.alldescs=['userid','username']
 
     def checkclassid(self):
         # 检查学校ID是否存在
@@ -322,10 +324,10 @@ class GetstwStudent(object):
                 messes.append(mess)
             return messes
 
-        descnames=['userid','username','topicnum','rightnum']
-        sql="SELECT userid,username,SUM(topicnum)AS `topicnum`,sum(countright)AS rightnum FROM product_stw_subcount WHERE classid = %s " \
-            "AND subjectid = %s AND unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s GROUP BY userid,username"\
-            %(self.classid,self.subjectid,self.starttime,self.endedtime)
+        descnames=['userid', 'username', 'oldtopicnum', 'topicnum', 'rightnum']
+        sql="SELECT userid,username,SUM(oldtopicnum)AS `oldtopicnum`,SUM(topicnum)AS `topicnum`,sum(countright)AS rightnum FROM product_stw_subcount " \
+            "WHERE classid = %s AND subjectid = %s AND unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s GROUP BY userid,username"\
+            %(self.classid, self.subjectid, self.starttime, self.endedtime)
         data_list = db.session.execute(sql)
         messes = []
         for datas in data_list:
@@ -341,7 +343,7 @@ class GetstwStudent(object):
             for rdataf in messes:
                 if rdataf["userid"] == int(allmess["userid"]):
                     allmess["username"] = rdataf["username"]
-                    allmess["topicnum"] = rdataf["topicnum"]
+                    allmess["topicnum"] = rdataf["oldtopicnum"]*10
                     allmess["rightnum"] = rdataf["rightnum"]
                     allmess["rightrate"] = rdataf["rightrate"]
             if len(allmess) == len(self.alldescs):
@@ -356,9 +358,9 @@ class GetstwStudent(object):
         traceId = getTraceId()
         if self.classid and self.schoolid and self.subjectid:
             if self.checkclid == 'right':
-                datav = self.getstwstudent()
-                codenum = 200
-                messa = 'successful!'
+                datav=self.getstwstudent()
+                codenum=200
+                messa='successful!'
             else:
                 datav = 'No data!'
                 codenum = 400
@@ -384,8 +386,8 @@ class GetstwStudent(object):
         # log('logInfo:Getbookid - ', data['code'])
         return data
 
-@getStwInfo.route('/bigdata/product_stw/getid', methods=['GET'])
+@getStwInfo.route('/getid', methods=['GET'])
 @cache.cached(timeout=10,key_prefix='view_%s',unless=None)
 def getid():
-    print("cachetest")
-    return jsonify({'test success': 1131231})
+    return jsonify({'test success':1131231})
+
