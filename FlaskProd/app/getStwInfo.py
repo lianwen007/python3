@@ -8,24 +8,26 @@ db = SQLAlchemy(app)
 
 getStwInfo = Blueprint('getStwInfo',__name__)
 
+
 def getTraceId():
     import uuid
     return str(uuid.uuid1()).replace('-', '')
 
-@getStwInfo.route('/getstwinfo', methods=['POST','GET'])  # 指定接口访问的路径，支持什么请求方式get，post
+
+@getStwInfo.route('/getstwinfo', methods=['POST', 'GET'])  # 指定接口访问的路径，支持什么请求方式get，post
 def get_stwinfo():
-    if request.method=='POST':
+    if request.method == 'POST':
         # userid = request.args.get('userid') #使用request.args.get方式获取拼接的入参数据
         schoolid = request.json.get('schoolid')  # 获取带json串请求的userid参数传入的值
         starttime = request.json.get('starttime', int(time.time()) - 24*60*60*8)
         endedtime = request.json.get('endedtime', int(time.time()))
-        bookid = request.json.get('bookid','%')
-        classid = request.json.get('classid',0)
-        gettype = request.json.get('gettype',0)
+        bookid = request.json.get('bookid', '%')
+        classid = request.json.get('classid', 0)
+        gettype = request.json.get('gettype', 0)
         subjectname = request.json.get('subjectname','subname')
     # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
-    if request.method=='GET':
-        return jsonify({'Msg':"Error.You should change the Method to 'Post'!",'Code':405,})
+    if request.method == 'GET':
+        return jsonify({'Msg': "Error.You should change the Method to 'Post'!", 'Code': 405, })
     if gettype == 'getbookid':
         s = Getbookid(schoolid)
     elif gettype == 'getstudent':
@@ -35,15 +37,29 @@ def get_stwinfo():
     return jsonify(s.main())
         #json.dumps(s.main(), ensure_ascii=False)
 
+
+@getStwInfo.route('/getLiveHp', methods=['GET'])
+def get_stw_livehp():
+    password = request.values.get('password')
+    school_id = str(request.values.get('schoolId', ''))
+    class_id = str(request.values.get('classId', ''))
+    if password == 'bigdata123':
+        data = get_live_student_hp(school_id, class_id)
+    else:
+        data = {'msg': 'Error, Password was wrong!'}
+    return jsonify(data)
+
+
 @getStwInfo.route('/stwInfoHp/clearCache', methods=['GET'])
 def stwcache_clear():
     password = request.values.get('password')
     if password == 'bigdata123':
         cache.clear()
-        datas = {'msg':'Successful! Clear All'}
+        datas = {'msg': 'Successful! Clear All'}
     else:
-        datas = {'msg':'Error, Password was wrong!'}
+        datas = {'msg': 'Error, Password was wrong!'}
     return jsonify(datas)
+
 
 class Getstwinfo(object):
     def __init__(self, schoolid, starttime, endedtime, bookid, classid):
@@ -106,7 +122,7 @@ class Getstwinfo(object):
         # 数据拉取的主函数
         @cache.memoize(timeout=3000)
         def get_live_hp(schoolIds, classIds):
-            # 调取业务实时数据接口，取得数据
+            # 调取业务实时数据接口，取得数据 ### 20180409已停用
             url = 'http://127.0.0.1:18889/student/studentInfo'
             # url = 'http://bigdata.yunzuoye.net/student/studentInfo'
             if classIds is None or classIds == '' or classIds == 0:
@@ -161,7 +177,7 @@ class Getstwinfo(object):
                         if i <= 10:
                             rdata[descnames[i]] = dataf[0][descnames[i]]
                         elif i <= 16:
-                            if dataf[z][descnames[i]] == None:
+                            if not dataf[z][descnames[i]]:
                                 dataf[z][descnames[i]] = 0
                             num[i - 11] += dataf[z][descnames[i]]
                             rdata[descnames[i]] = num[i - 11]
@@ -182,7 +198,7 @@ class Getstwinfo(object):
                         if i <= 10:
                             rdata[descnames[i]] = dataf[0][descnames[i]]
                         elif i <= 16:
-                            if dataf[z][descnames[i]] == None:
+                            if not dataf[z][descnames[i]]:
                                 dataf[z][descnames[i]] = 0
                             num[i - 11] += dataf[z][descnames[i]]
                             rdata[descnames[i]] = num[i - 11]
@@ -194,7 +210,7 @@ class Getstwinfo(object):
                                 rdata[descnames[15]] = int((rdata[descnames[15]] / len(dataf)) * 100) / 100
                                 rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
                 rdatafin.append(rdata)
-        reqdatas=get_live_hp(self.schoolid,self.classid)
+        reqdatas = get_live_student_hp(self.schoolid, self.classid)
         allmesses = self.get_all_user()
         findescnames = ['countscore', 'numhomework', 'numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime']
         alldatas = []
@@ -245,6 +261,7 @@ class Getstwinfo(object):
         log('APIRequest-', logInfo)
         return data
 
+
 class Getbookid(object):
     def __init__(self, schoolid):
         self.schoolid = schoolid
@@ -287,6 +304,7 @@ class Getbookid(object):
         log('APIRequest-', logInfo)
         # log('logInfo:Getbookid - ', data['code'])
         return data
+
 
 class GetstwStudent(object):
     def __init__(self,schoolid, starttime, endedtime, subjectname , classid):
@@ -386,8 +404,29 @@ class GetstwStudent(object):
         # log('logInfo:Getbookid - ', data['code'])
         return data
 
+
+@cache.memoize(timeout=3000)
+def get_live_student_hp(schoolid='', classid=''):
+    import pymongo
+    mongo_url = "172.16.10.28:50000"
+    client = pymongo.MongoClient(mongo_url)
+    mongo_db = client.xh_king
+    projection_fields = {'_id': False, 'studentId': True, 'hp': True, 'credit': True,
+                         'schoolId': True, 'classId': True, 'grade': True}
+    if not classid:
+        query_args = {"schoolId": {"$in": list(map(int, str(schoolid).split(',')))}}
+    else:
+        query_args = {"classId": {"$in": list(map(int, str(classid).split(',')))}}
+    results = mongo_db.student.find(query_args, projection=projection_fields)
+    data = list()
+    for result in results:
+        data.append(result)
+    return data
+
+
 @getStwInfo.route('/getid', methods=['GET'])
 @cache.cached(timeout=10,key_prefix='view_%s',unless=None)
 def getid():
-    return jsonify({'test success':1131231})
+    print("cachetest")
+    return jsonify({'test success': 1131231})
 
