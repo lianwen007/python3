@@ -16,26 +16,30 @@ def getTraceId():
 
 @getStwInfo.route('/getstwinfo', methods=['POST', 'GET'])  # 指定接口访问的路径，支持什么请求方式get，post
 def get_stwinfo():
-    if request.method == 'POST':
-        # userid = request.args.get('userid') #使用request.args.get方式获取拼接的入参数据
-        schoolid = request.json.get('schoolid')  # 获取带json串请求的userid参数传入的值
-        starttime = request.json.get('starttime', int(time.time()) - 24*60*60*8)
-        endedtime = request.json.get('endedtime', int(time.time()))
-        bookid = request.json.get('bookid', '%')
-        classid = request.json.get('classid', 0)
-        gettype = request.json.get('gettype', 0)
-        subjectname = request.json.get('subjectname','subname')
-    # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
-    if request.method == 'GET':
-        return jsonify({'Msg': "Error.You should change the Method to 'Post'!", 'Code': 405, })
-    if gettype == 'getbookid':
-        s = Getbookid(schoolid)
-    elif gettype == 'getstudent':
-        s = GetstwStudent(schoolid, starttime, endedtime, subjectname, classid)
-    else:
-        s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid)
-    return jsonify(s.main())
-        #json.dumps(s.main(), ensure_ascii=False)
+    try:
+        if request.method == 'POST':
+            # userid = request.args.get('userid') # 使用request.args.get方式获取拼接的入参数据
+            schoolid = request.json.get('schoolid')  # 获取带json串请求的userid参数传入的值
+            starttime = request.json.get('starttime', int(time.time()) - 24*60*60*8)
+            endedtime = request.json.get('endedtime', int(time.time()))
+            bookid = request.json.get('bookid', '%')
+            classid = request.json.get('classid', 0)
+            gettype = request.json.get('gettype', 0)
+            subjectname = request.json.get('subjectname','subname')
+        # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
+        if request.method == 'GET':
+            return jsonify({'msg': "Error.You should change the Method to 'Post'!", 'Code': 405, })
+        if gettype == 'getbookid':
+            s = Getbookid(schoolid)
+        elif gettype == 'getstudent':
+            s = GetstwStudent(schoolid, starttime, endedtime, subjectname, classid)
+        else:
+            s = Getstwinfo(schoolid, starttime, endedtime, bookid, classid)
+        return jsonify(s.main())
+            # json.dumps(s.main(), ensure_ascii=False)
+    except AttributeError:
+        data = {"code": "405", "msg": "Values error, Check your 'Content-Type' first!"}
+        return jsonify(data)
 
 
 @getStwInfo.route('/getLiveHp', methods=['GET'])
@@ -142,14 +146,12 @@ class Getstwinfo(object):
         if self.classid is None or self.classid == ''or self.classid == 0:
             sqlsel = "select * from product_stw_daycount where schoolid in (%s) \
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s) \
-                and bookid like '%s' order by `datetime` DESC " % (
-            self.schoolid, self.starttime, self.endedtime, self.bookid)
+                and bookid like '%s' order by `datetime` DESC " % (self.schoolid, self.starttime, self.endedtime, self.bookid)
         else:
             sqlsel = "select * from product_stw_daycount where schoolid in (%s) \
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s) \
-                and classid in (%s) and bookid like '%s' order by `datetime` DESC " % (
-            self.schoolid, self.starttime, self.endedtime, self.classid, self.bookid)
-        data_list  = db.session.execute(sqlsel)
+                and classid in (%s) and bookid like '%s' order by `datetime` DESC " % (self.schoolid, self.starttime, self.endedtime, self.classid, self.bookid)
+        data_list = db.session.execute(sqlsel)
         messes, mesind, finad = [], [], []
         for datas in data_list:
             mess = {}
@@ -210,13 +212,16 @@ class Getstwinfo(object):
                                 rdata[descnames[15]] = int((rdata[descnames[15]] / len(dataf)) * 100) / 100
                                 rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
                 rdatafin.append(rdata)
-        reqdatas = get_live_student_hp(self.schoolid, self.classid)
+        try:
+            reqdatas = get_live_student_hp(self.schoolid, self.classid)
+        except:
+            reqdatas = []
         allmesses = self.get_all_user()
         findescnames = ['countscore', 'numhomework', 'numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime']
         alldatas = []
         for allmess in allmesses:
             for rdataf in rdatafin:
-                if rdataf["userid"] == int(allmess["userid"]):
+                if str(rdataf["userid"]) == str(allmess["userid"]):
                     allmess["countscore"] = rdataf["countscore"]
                     allmess["numhomework"] = rdataf["numhomework"]
                     allmess["numselfwork"] = rdataf["numselfwork"]
@@ -232,10 +237,10 @@ class Getstwinfo(object):
         lastdatas = []
         for adatas in alldatas:
             for reqdata in reqdatas:
-                if reqdata["studentId"] == int(adatas["userid"]):
+                if str(reqdata["studentId"]) == str(adatas["userid"]):
                     adatas["hp"] = reqdata["hp"]
                     adatas["credit"] = reqdata["credit"]
-            if len(adatas) == len(self.alldescs) + len(findescnames):
+            if len(adatas) == len(self.alldescs) + len(findescnames) + 1:
                 adatas["credit"] = adatas["hp"] = 0
             adatas['bookname'] = rdatafin[0]['bookname']
             lastdatas.append(adatas)
@@ -245,7 +250,7 @@ class Getstwinfo(object):
         #  判定有学校ID和对应的书本id后，再执行数据拉取，并写入日志
         self.checkschoolid()
         self.checkbookid()
-        traceId=getTraceId()
+        traceId = getTraceId()
         data = {}
         data['traceId']= traceId
         if self.checkscid == 'right' and self.checkBookid == 'right':
@@ -294,12 +299,12 @@ class Getbookid(object):
 
     def main(self):
         datav = Getbookid.findallbookid(self)
-        traceId=getTraceId()
+        traceId = getTraceId()
         data = {}
         data['traceId'] = traceId
         data['code'] = 200
         data['data'] = datav
-        data['msg'] = 'successful!'
+        data['msg'] = 'Successful!'
         logInfo = str(data['code'])+'['+ traceId + ']type[getBookid]' + 'scid[All]'
         log('APIRequest-', logInfo)
         # log('logInfo:Getbookid - ', data['code'])
@@ -359,7 +364,7 @@ class GetstwStudent(object):
         alldatas = []
         for allmess in allmesses:
             for rdataf in messes:
-                if rdataf["userid"] == int(allmess["userid"]):
+                if str(rdataf["userid"]) == str(allmess["userid"]):
                     allmess["username"] = rdataf["username"]
                     allmess["topicnum"] = rdataf["oldtopicnum"]*10
                     allmess["rightnum"] = rdataf["rightnum"]
@@ -419,13 +424,14 @@ def get_live_student_hp(schoolid='', classid=''):
         query_args = {"classId": {"$in": list(map(int, str(classid).split(',')))}}
     results = mongo_db.student.find(query_args, projection=projection_fields)
     data = list()
-    for result in results:
-        data.append(result)
+    if results:
+        for result in results:
+            data.append(result)
     return data
 
 
 @getStwInfo.route('/getid', methods=['GET'])
-@cache.cached(timeout=10,key_prefix='view_%s',unless=None)
+@cache.cached(timeout=10, key_prefix='view_%s', unless=None)
 def getid():
     print("cachetest")
     return jsonify({'test success': 1131231})
