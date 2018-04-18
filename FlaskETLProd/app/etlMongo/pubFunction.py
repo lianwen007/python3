@@ -1,12 +1,21 @@
 import pymongo
+import pymysql
 import time
-from config import mongo_url, etl_log_path
+from config import mongo_url, etl_log_path, mysql_config
 
 
 def mongo_client():
     # Mongo连接
     client = pymongo.MongoClient(mongo_url)
     return client.xh_king
+
+
+def mysql_client(dbname):
+    # Mysql 连接函数，参数为库名
+    m = mysql_config
+    db_client = pymysql.connect(host=m.get('hostname'), port=m.get('port'), user=m.get('user'),
+                                passwd=m.get('password'), db=dbname, charset='utf8',)
+    return db_client
 
 
 def set_time_path():
