@@ -54,6 +54,21 @@ def get_stw_livehp():
     return jsonify(data)
 
 
+@getStwInfo.route('/getLiveIntegral', methods=['GET'])
+def get_stw_live_integral():
+    password = request.values.get('password')
+    school_id = str(request.values.get('schoolId', ''))
+    class_id = str(request.values.get('classId', ''))
+    book_id = str(request.values.get('bookId', ''))
+    starttime = request.values.get('startTime', int(time.time()) - 24 * 60 * 60 * 8)
+    endedtime = request.values.get('endedTime', int(time.time()))
+    if password == 'bigdata123':
+        data = get_live_student_integral(school_id, class_id, book_id, starttime, endedtime)
+    else:
+        data = {'msg': 'Error, Password was wrong!'}
+    return jsonify(data)
+
+
 @getStwInfo.route('/stwInfoHp/clearCache', methods=['GET'])
 def stwcache_clear():
     password = request.values.get('password')
@@ -117,10 +132,19 @@ class Getstwinfo(object):
         if self.checkBookid == 'right':
             sqlsel = "select DISTINCT subtype from product_stw_subject WHERE bookid in ('%s')" % (self.bookid)
             data_list = db.session.execute(sqlsel)
-            datas = [x for x in data_list][0][0]
-            return datas
+            for x in data_list:
+                datas = x[0]
+                return datas
         else:
             return 0
+
+    def get_book_name(self):
+        if self.bookid:
+            sqlsel = "select DISTINCT bookname from product_stw_subject WHERE bookid in ('%s')" % (self.bookid)
+            data_list = db.session.execute(sqlsel)
+            for x in data_list:
+                datas = x[0]
+                return datas
 
     def getkinginfo(self):
         # 数据拉取的主函数
@@ -143,7 +167,7 @@ class Getstwinfo(object):
         descnames = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'classid',
                      'bookname', 'bookid', 'hp', 'credit', 'countscore', 'numhomework', 'numselfwork',
                      'topicnum', 'countright', 'rightlv', 'counttime', 'datetime']
-        if self.classid is None or self.classid == ''or self.classid == 0:
+        if not self.classid or self.classid == ''or self.classid == 0:
             sqlsel = "select * from product_stw_daycount where schoolid in (%s) \
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s) \
                 and bookid like '%s' order by `datetime` DESC " % (self.schoolid, self.starttime, self.endedtime, self.bookid)
@@ -242,9 +266,21 @@ class Getstwinfo(object):
                     adatas["credit"] = reqdata["credit"]
             if len(adatas) == len(self.alldescs) + len(findescnames) + 1:
                 adatas["credit"] = adatas["hp"] = 0
-            adatas['bookname'] = rdatafin[0]['bookname']
+            adatas['bookname'] = self.get_book_name()
+            adatas['integral'] = 0
             lastdatas.append(adatas)
-        return lastdatas
+        try:
+            students_integral = get_live_student_integral(self.schoolid, self.classid, self.bookid, self.starttime, self.endedtime)
+        except:
+            students_integral = []
+        fin_datas = list()
+        for lastdata in lastdatas:
+            if students_integral:
+                for student_integral in students_integral:
+                    if str(lastdata['userid']) == str(student_integral['studentId']):
+                        lastdata['integral'] = student_integral['integral']
+            fin_datas.append(lastdata)
+        return fin_datas
 
     def main(self):
         #  判定有学校ID和对应的书本id后，再执行数据拉取，并写入日志
@@ -260,7 +296,7 @@ class Getstwinfo(object):
         else:
             data['code'] = 400
             data['msg'] = 'These schools or books are not exist!'
-        logInfo = str(data['code'])  + '[' + traceId + ']type[getStwinfo]' + 'scid[' + self.schoolid + ']'\
+        logInfo = str(data['code']) + '[' + traceId + ']type[getStwinfo]' + 'scid[' + self.schoolid + ']'\
                   + 'sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']' + 'bkid[' +\
                 str(self.bookid) + ']' + 'clid[' + str(self.classid) + ']'
         log('APIRequest-', logInfo)
@@ -275,7 +311,7 @@ class Getbookid(object):
         # 获取所有书本ID对应书名
         sqlsel = "select distinct bookname,bookid,subtype from product_stw_subject"
         descnames = ['bookname', 'bookid','subtype']
-        data_list  = db.session.execute(sqlsel)
+        data_list = db.session.execute(sqlsel)
         messes = []
         for datas in data_list:
             mess = {}
@@ -412,6 +448,7 @@ class GetstwStudent(object):
 
 @cache.memoize(timeout=3000)
 def get_live_student_hp(schoolid='', classid=''):
+    # 获取学生的实时的体力和诚信分
     import pymongo
     mongo_url = "172.16.10.28:50000"
     client = pymongo.MongoClient(mongo_url)
@@ -428,6 +465,57 @@ def get_live_student_hp(schoolid='', classid=''):
         for result in results:
             data.append(result)
     return data
+
+
+@cache.memoize(timeout=3600)
+def get_live_student_integral(schoolid='', classid='', book_id='', start_time=0, end_time=0):
+    # 获取学生每局的得分求和，返回学生ID和对应的分数
+    import pymongo
+    mongo_url = "172.16.10.28:50000"
+    client = pymongo.MongoClient(mongo_url)
+    mongo_db = client.xh_king
+    projection_fields = {'_id': False, 'studentId': True, 'integral': True,
+                         'schoolId': True, 'classId': True}
+    if not classid:
+        query_args_school = {"schoolId": {"$in": list(map(int, str(schoolid).split(',')))}}
+        projection_fields_school = {'_id': False, 'studentId': True,
+                                    'schoolId': True, 'classId': True}
+        results_school = mongo_db.student.find(query_args_school, projection=projection_fields_school)
+        class_ids = list()
+        if results_school:
+            for result_school in results_school:
+                class_ids.append(result_school['classId'])
+            class_ids = list(set(class_ids))
+        query_args = {
+            "bookId": book_id,
+            "classId": {"$in": class_ids},
+            "createTime": {"$gte": start_time * 1000, "$lte": end_time * 1000}
+        }
+    else:
+        query_args = {
+            "bookId": book_id,
+            "classId": {"$in": list(map(int, str(classid).split(',')))},
+            "createTime": {"$gte": start_time * 1000, "$lte": end_time * 1000}
+        }
+    results = mongo_db.game.find(query_args, projection=projection_fields)
+    user_datas = list()
+    if results:
+        data = list()
+        user_sets = list()
+        for result in results:
+            user_sets.append(result['studentId'])
+            data.append(result)
+        user_sets = list(set(user_sets))
+        for user_id in user_sets:
+            fin_data = dict()
+            fin_data['integral'] = 0
+            for user_data in data:
+                if user_data['studentId'] == user_id:
+                    fin_data['integral'] += user_data['integral']
+            fin_data['integral'] = fin_data['integral']
+            fin_data['studentId'] = user_id
+            user_datas.append(fin_data)
+    return user_datas
 
 
 @getStwInfo.route('/getid', methods=['GET'])
