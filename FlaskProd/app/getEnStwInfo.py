@@ -13,6 +13,11 @@ def getTraceId():
     return str(uuid.uuid1()).replace('-', '')
 
 
+def keep_percent_point_num(num, point):
+    # 小数化为百分比，并保留小数位数
+    return int(num*10**(point+2))/10**point
+
+
 @getEnStwInfo.route('/getEnStwInfo', methods=['GET'])
 def get_enstw_info():
     schoolid = request.values.get('schoolId')
@@ -111,18 +116,22 @@ class GetEnStwInfo(object):
                 if int(rdataf["userId"]) == int(allmess["userId"]):
                     for finone in descnames[5:]:
                         allmess[finone] = rdataf[finone]
+                    num_count = allmess['selfCount'] + allmess['gameCount']
                     if allmess['gameCount'] > 0:
                         allmess['finishRate'] = int((allmess['finCount'] / allmess['gameCount'])*1000)/10
                     else:
                         allmess['finishRate'] = 0
-                    if allmess['gameCount'] > 0:
-                        allmess['fullRate'] = int((allmess['homeFull'] / allmess['gameCount'])*1000)/10
+                    if num_count > 0:
+                        allmess['fullRate'] = int(((allmess['homeFull'] + allmess['selfFull'])/num_count)*1000)/10
                     else:
                         allmess['fullRate'] = 0
-                    if allmess['selfCount'] > 0:
-                        allmess['rightRate'] = int((allmess['selfFull'] / allmess['selfCount'])*1000)/10
+                    if allmess['blankNum'] == 0:
+                        if allmess['listenNum'] == 0:
+                            allmess['rightRate'] = allmess['readRate']
+                        else:
+                            allmess['rightRate'] = int(((allmess['listenRate'] + allmess['readRate']) / 2)*10)/10
                     else:
-                        allmess['rightRate'] = 0
+                        allmess['rightRate'] = int(((allmess['listenRate']+allmess['readRate']+allmess['blankRate'])/3)*10)/10
             if len(allmess) == len(self.alldescs):
                  for findena in descnames[5:]:
                      allmess[findena] = 0
@@ -131,7 +140,7 @@ class GetEnStwInfo(object):
         return alldatas
 
     def main(self):
-        data = {}
+        data = { }
         data['traceId'] = getTraceId()
         self.check_school_id()
         if self.checkscid == 'right':
