@@ -55,7 +55,7 @@ class GetEnStwInfo(object):
                 and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
         self.schoolid, self.starttime, self.endedtime)
         rs = db.session.execute(sql)
-        if len([chrs for chrs in rs ])>0:
+        if len([chrs for chrs in rs]) > 0:
             self.checkscid = 'right'
 
     def get_enstw_info(self):
@@ -78,18 +78,21 @@ class GetEnStwInfo(object):
             return messes
 
         descnames = ['userId', 'userName', 'schoolId', 'classId', 'className', 'gameCount', 'finCount',
-                     'homeFull', 'selfCount', 'selfFull', 'listenNum', 'readNum', 'blankNum']
+                     'homeFull', 'selfCount', 'selfFull', 'listenFull', 'readFull', 'blankFull', 'listenRate',
+                     'readRate', 'blankRate', 'listenNum', 'readNum', 'blankNum']
         if not self.classid or self.classid == '0':
             sqlsel = "SELECT userid,username,schoolid,classid,classname,CAST(SUM(gamecount)AS SIGNED),CAST(SUM(finishcount)AS SIGNED),\
-                CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listennum)AS SIGNED),\
-                 CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED) FROM product_stw_encount WHERE schoolid=%s \
-                  AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
+            CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listenfull)AS SIGNED),\
+            CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(listenrate)AS SIGNED),CAST(AVG(readrate)AS SIGNED),\
+            CAST(AVG(blankrate)AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED)\
+            FROM product_stw_encount WHERE schoolid=%s AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
                  % (self.schoolid, self.starttime, self.endedtime)
         else:
             sqlsel = "SELECT userid,username,schoolid,classid,classname,CAST(SUM(gamecount)AS SIGNED),CAST(SUM(finishcount)AS SIGNED),\
-                          CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listennum)AS SIGNED),\
-                          CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED) FROM product_stw_encount WHERE classid=%s \
-                          AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
+                          CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listenfull)AS SIGNED),\
+            CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(listenrate)AS SIGNED),CAST(AVG(readrate)AS SIGNED),\
+            CAST(AVG(blankrate)AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED)\
+             FROM product_stw_encount WHERE classid=%s AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
                      % (self.classid, self.starttime, self.endedtime)
         data_list = db.session.execute(sqlsel)
         messes = []
@@ -108,15 +111,27 @@ class GetEnStwInfo(object):
                 if int(rdataf["userId"]) == int(allmess["userId"]):
                     for finone in descnames[5:]:
                         allmess[finone] = rdataf[finone]
+                    if allmess['gameCount'] > 0:
+                        allmess['finishRate'] = int((allmess['finCount'] / allmess['gameCount'])*1000)/10
+                    else:
+                        allmess['finishRate'] = 0
+                    if allmess['gameCount'] > 0:
+                        allmess['fullRate'] = int((allmess['homeFull'] / allmess['gameCount'])*1000)/10
+                    else:
+                        allmess['fullRate'] = 0
+                    if allmess['selfCount'] > 0:
+                        allmess['rightRate'] = int((allmess['selfFull'] / allmess['selfCount'])*1000)/10
+                    else:
+                        allmess['rightRate'] = 0
             if len(allmess) == len(self.alldescs):
                  for findena in descnames[5:]:
                      allmess[findena] = 0
+                 allmess['finishRate'] = allmess['fullRate'] = allmess['rightRate'] = 0
             alldatas.append(allmess)
-
         return alldatas
 
     def main(self):
-        data = { }
+        data = {}
         data['traceId'] = getTraceId()
         self.check_school_id()
         if self.checkscid == 'right':
