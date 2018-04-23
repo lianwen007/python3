@@ -5,6 +5,7 @@ from app.etlMongo.pubFunction import set_log
 from app.etlMongo.tabStudent import get_stu_info
 from app.etlMongo.tabHomework import get_homework
 from app.etlMongo.tabGame import get_game_info
+from .shellPy import data_etl_ext
 import datetime
 import time
 
@@ -76,10 +77,11 @@ def on_time_etl():
     get_stu_info()
     get_homework()
     get_game_info()
+    etl_result = 0  # data_etl_ext()
 
     end_time = time.time()
     finish_time = start_time - end_time
-    set_log('etlAutoTable-', str(finish_time))
-
+    log_info = 'Code['+etl_result+']TimeCost['+str(finish_time)+']'
+    set_log('etlAutoTable-', log_info)
 
 sched.start()
