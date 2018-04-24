@@ -5,7 +5,7 @@ from app.etlMongo.pubFunction import set_log
 from app.etlMongo.tabStudent import get_stu_info
 from app.etlMongo.tabHomework import get_homework
 from app.etlMongo.tabGame import get_game_info
-from .shellPy import data_etl_ext
+from . import shellPy
 import datetime
 import time
 
@@ -34,7 +34,7 @@ def etl_student():
     else:
         datas = {'msg': 'Error, Password was wrong!'}
     end_time = time.time()
-    finish_time = start_time - end_time
+    finish_time = end_time - start_time
     set_log('etlStudent-', str(finish_time))
     return jsonify(datas)
 
@@ -49,7 +49,7 @@ def etl_homework():
     else:
         datas = {'msg': 'Error, Password was wrong!'}
     end_time = time.time()
-    finish_time = start_time - end_time
+    finish_time = end_time - start_time
     set_log('etlHomework-', str(finish_time))
     return jsonify(datas)
 
@@ -64,7 +64,7 @@ def etl_game():
     else:
         datas = {'msg': 'Error, Password was wrong!'}
     end_time = time.time()
-    finish_time = start_time - end_time
+    finish_time = end_time - start_time
     set_log('etlGame-', str(finish_time))
     return jsonify(datas)
 
@@ -74,13 +74,14 @@ def etl_game():
 def on_time_etl():
     start_time = time.time()
 
+    shellPy.local_shell_ext(shellPy.local_mv_command)  # 先执行本地MV命令
     get_stu_info()
     get_homework()
     get_game_info()
     etl_result = 0  # data_etl_ext()
 
     end_time = time.time()
-    finish_time = start_time - end_time
+    finish_time = end_time - start_time
     log_info = 'Code['+etl_result+']TimeCost['+str(finish_time)+']'
     set_log('etlAutoTable-', log_info)
 
