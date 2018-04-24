@@ -1,0 +1,11 @@
+Question:
+action.search.shard_count.limit: 搜索的shard number限制，超过设置的number的query请求会被拒绝。
+
+re:
+curl -u admin:admin -XPUT http://172.16.10.244:9200/_cluster/settings -H 'Content-Type: application/json' -d'
+{
+    "persistent" : {
+        "action.search.shard_count.limit" : "3000"
+    }
+}
+'
