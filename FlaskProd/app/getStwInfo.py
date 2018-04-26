@@ -233,7 +233,8 @@ class Getstwinfo(object):
                                 rdata[descnames[15]] = rdata[descnames[16]] = 0
                             else:
                                 rdata[descnames[13]] = rdata[descnames[13]]/10
-                                rdata[descnames[15]] = int((rdata[descnames[15]] / len(dataf)) * 100) / 100
+                               # rdata[descnames[15]] = int((rdata[descnames[15]] / len(dataf)) * 100) / 100
+                                rdata[descnames[15]] = int((rdata[descnames[15]] / rdata[descnames[13]]) * 100) / 100
                                 rdata[descnames[16]] = int((rdata[descnames[16]] / rdata[descnames[13]]) * 10) / 10
                 rdatafin.append(rdata)
         try:
