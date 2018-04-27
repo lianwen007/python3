@@ -1,10 +1,11 @@
 from flask import Blueprint, render_template, redirect,request,jsonify
-from app import app, cache
-from app import sched
+from app import app
+from app import sched, trigger
 from app.etlMongo.pubFunction import set_log
 from app.etlMongo.tabStudent import get_stu_info
 from app.etlMongo.tabHomework import get_homework
 from app.etlMongo.tabGame import get_game_info
+from . import shellPy
 import datetime
 import time
 
@@ -18,7 +19,7 @@ def getTraceId():
 
 @getEtl.route('/etlTest/gettest', methods=['GET'])
 def etl_test():
-    print('aaaTestNow is %s' % datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    # print('aaaTestNow is %s' % datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     datas = {'msg': 'Successful!'}
     return jsonify(datas)
 
@@ -29,12 +30,14 @@ def etl_student():
     start_time = time.time()
     if password == 'bigdata123':
         get_stu_info()
-        datas = {'msg': 'Succeed to import table of student!'}
+        code = 200
+        datas = {'msg': 'Succeed to import table of student!', 'code': code}
     else:
-        datas = {'msg': 'Error, Password was wrong!'}
+        code = 400
+        datas = {'msg': 'Error, Password was wrong!', 'code': code}
     end_time = time.time()
-    finish_time = start_time - end_time
-    set_log('etlStudent-', str(finish_time))
+    finish_time = end_time - start_time
+    set_log('etlStudent-', str(code) + ':' + str(finish_time))
     return jsonify(datas)
 
 
@@ -44,12 +47,14 @@ def etl_homework():
     start_time = time.time()
     if password == 'bigdata123':
         get_homework()
-        datas = {'msg': 'Succeed to import table of homework!'}
+        code = 200
+        datas = {'msg': 'Succeed to import table of homework!', 'code': code}
     else:
-        datas = {'msg': 'Error, Password was wrong!'}
+        code = 400
+        datas = {'msg': 'Error, Password was wrong!', 'code': code}
     end_time = time.time()
-    finish_time = start_time - end_time
-    set_log('etlHomework-', str(finish_time))
+    finish_time = end_time - start_time
+    set_log('etlHomework-', str(code) + ':' + str(finish_time))
     return jsonify(datas)
 
 
@@ -59,24 +64,28 @@ def etl_game():
     start_time = time.time()
     if password == 'bigdata123':
         get_game_info()
-        datas = {'msg': 'Succeed to import table of homework!'}
+        code = 200
+        datas = {'msg': 'Succeed to import table of game!', 'code': code}
     else:
-        datas = {'msg': 'Error, Password was wrong!'}
+        code = 400
+        datas = {'msg': 'Error, Password was wrong!', 'code': code}
     end_time = time.time()
-    finish_time = start_time - end_time
-    set_log('etlGame-', str(finish_time))
+    finish_time = end_time - start_time
+    set_log('etlGame-', str(code) + ':' + str(finish_time))
     return jsonify(datas)
 
 
-# @sched.scheduled_job('cron', hour=0, minute=5, day='*', id='on_time_etl')
-#@sched.scheduled_job('cron', second='*/3', id='on_time_etl_first')
+@sched.scheduled_job(trigger)
 def on_time_etl():
+    start_time = time.time()
 
-    print('aaaTestNow is %s' % datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    shellPy.local_shell_ext(shellPy.local_mv_command)  # 先执行本地MV命令
+    get_stu_info()
+    get_homework()
+    get_game_info()
+    etl_result = shellPy.data_etl_ext()
 
-sched.remove_all_jobs()
-print(sched.get_jobs())
-#sched.start()
-# def sched_start():
-#     sched.start()
-
+    end_time = time.time()
+    finish_time = end_time - start_time
+    log_info = 'Code[' + str(etl_result) + ']TimeCost[' + str(finish_time) + ']'
+    set_log('etlAutoTable-', log_info)
