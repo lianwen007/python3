@@ -1,12 +1,12 @@
 from flask import Blueprint, render_template, redirect, request, jsonify
-from app import app,cache
+from app import app, cache
 from .relog import log
 #from .models import Stwdaycount
 import json,time,requests
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
 
-getStwInfoRecode = Blueprint('RecodeGetStwInfo',__name__)
+getStwInfo = Blueprint('getStwInfo', __name__)
 
 
 def getTraceId():
@@ -14,12 +14,12 @@ def getTraceId():
     return str(uuid.uuid1()).replace('-', '')
 
 
-@getStwInfoRecode.route('/getstwinfo', methods=['POST', 'GET'])  # 指定接口访问的路径，支持什么请求方式get，post
-def get_stwinfo():
+@getStwInfo.route('/getstwinfo', methods=['POST', 'GET'])  # 指定接口访问的路径，支持什么请求方式get，post
+def get_stw_info():
     try:
         if request.method == 'POST':
             # userid = request.args.get('userid') # 使用request.args.get方式获取拼接的入参数据
-            schoolid = request.json.get('schoolid')  # 获取带json串请求的userid参数传入的值
+            schoolid = request.json.get('schoolid')  # 获取带json串请求的schoolid参数传入的值
             starttime = request.json.get('starttime', int(time.time()) - 24*60*60*8)
             endedtime = request.json.get('endedtime', int(time.time()))
             bookid = request.json.get('bookid', '%')
@@ -32,9 +32,11 @@ def get_stwinfo():
         if gettype == 'getbookid':
             s = Getbookid(schoolid)
         elif gettype == 'getstudent':
-            s = GetstwStudent(schoolid, starttime, endedtime, subjectname, classid)
+            s = GetStwStudent(school_id=schoolid, start_time=starttime, end_time=endedtime,
+                              subject_name=subjectname, class_id=classid)
         else:
-            s = GetStwInfo(school_id=schoolid, start_time=starttime, end_time=endedtime, book_id=bookid, class_id=classid)
+            s = GetStwInfo(school_id=schoolid, start_time=starttime, end_time=endedtime,
+                           book_id=bookid, class_id=classid)
         return jsonify(s.main())
             # json.dumps(s.main(), ensure_ascii=False)
     except AttributeError:
@@ -42,8 +44,8 @@ def get_stwinfo():
         return jsonify(data)
 
 
-@getStwInfoRecode.route('/getLiveHp', methods=['GET'])
-def get_stw_livehp():
+@getStwInfo.route('/getLiveHp', methods=['GET'])
+def get_stw_live_hp():
     password = request.values.get('password')
     school_id = str(request.values.get('schoolId', ''))
     class_id = str(request.values.get('classId', ''))
@@ -55,7 +57,7 @@ def get_stw_livehp():
     return jsonify(data)
 
 
-@getStwInfoRecode.route('/getLiveIntegral', methods=['GET'])
+@getStwInfo.route('/getLiveIntegral', methods=['GET'])
 def get_stw_live_integral():
     password = request.values.get('password')
     school_id = str(request.values.get('schoolId', ''))
@@ -72,15 +74,15 @@ def get_stw_live_integral():
     return jsonify(data)
 
 
-@getStwInfoRecode.route('/stwInfoHp/clearCache', methods=['GET'])
-def stwcache_clear():
+@getStwInfo.route('/stwInfoHp/clearCache', methods=['GET'])
+def stw_cache_clear():
     password = request.values.get('password')
     if password == 'bigdata123':
         cache.clear()
-        datas = {'msg': 'Successful! Clear All'}
+        data = {'msg': 'Successful! Clear All'}
     else:
-        datas = {'msg': 'Error, Password was wrong!'}
-    return jsonify(datas)
+        data = {'msg': 'Error, Password was wrong!'}
+    return jsonify(data)
 
 
 class StwInfoBase(object):
@@ -119,17 +121,17 @@ class StwInfoBase(object):
         def get_all_user_cache(school_id, class_id):
             names = ['userid', 'username', 'schoolid', 'classname']
             if not class_id or class_id == 0:
-                sqlsel = "SELECT DISTINCT userid,username,schoolid,classname FROM teacher_student_info " \
+                sql = "SELECT DISTINCT userid,username,schoolid,classname FROM teacher_student_info " \
                          "WHERE classname!='教师' AND schoolid IN (%s)" % school_id
             else:
-                sqlsel = "SELECT DISTINCT userid,username,schoolid,classname FROM teacher_student_info  " \
+                sql = "SELECT DISTINCT userid,username,schoolid,classname FROM teacher_student_info  " \
                          "WHERE classname!='教师' AND schoolid IN (%s) and classid IN (%s)" % (school_id, class_id)
-            data_lists = db.session.execute(sqlsel)
+            data_lists = db.session.execute(sql)
             messes = []
-            for datas in data_lists:
+            for data in data_lists:
                 mess = {}
-                for x in range(len(datas)):
-                    mess[names[x]] = datas[x]
+                for x in range(len(data)):
+                    mess[names[x]] = data[x]
                 messes.append(mess)
             return messes
         return get_all_user_cache(self.school_id, self.class_id)
@@ -160,7 +162,7 @@ class StwInfoBase(object):
         def get_hp(school_ids, class_ids):  # java提供接口 ## 20180409已停用
             url = 'http://127.0.0.1:18889/student/studentInfo'
             # url = 'http://bigdata.yunzuoye.net/student/studentInfo'
-            if class_ids is None or class_ids == 0:
+            if not class_ids or class_ids == 0:
                 data = {"schoolIds": school_ids, "password": "king123456", }
             else:
                 data = {"schoolIds": school_ids, "password": "king123456", "classIds": class_ids}
@@ -197,7 +199,7 @@ class StwInfoBase(object):
                 query_args = {'bookId': book_id, 'classId': {"$in": list(map(int, str(class_id).split(',')))},
                               'createTime': {"$gte": start_time * 1000, "$lte": end_time * 1000}}
             results = mongo_db.game.find(query_args, projection=projection_fields)
-            user_datas = list()
+            user_data_fin = list()
             if results:
                 data = list()
                 user_sets = list()
@@ -213,9 +215,9 @@ class StwInfoBase(object):
                             fin_data['integral'] += user_data['integral']
                     fin_data['integral'] = fin_data['integral']
                     fin_data['studentId'] = user_id
-                    user_datas.append(fin_data)
-            return user_datas
-        return get_live_student_integral(self.school_id, self.class_id, self.book_id, self.start_time ,self.end_time)
+                    user_data_fin.append(fin_data)
+            return user_data_fin
+        return get_live_student_integral(self.school_id, self.class_id, self.book_id, self.start_time, self.end_time)
 
     def get_sub_type(self):
         sqlsel = "SELECT DISTINCT subtype FROM product_stw_subject WHERE bookid IN ('%s')" % self.book_id
@@ -229,28 +231,28 @@ class StwInfoBase(object):
 
 class Getbookid(object):
 
-    def findallbookid(self):
+    def find_all_book_id(self):
         # 获取所有书本ID对应书名
-        sqlsel = "select distinct bookname,bookid,subtype from product_stw_subject"
-        descnames = ['bookname', 'bookid','subtype']
-        data_list = db.session.execute(sqlsel)
+        sql = "select distinct bookname,bookid,subtype from product_stw_subject"
+        desc_names = ['bookname', 'bookid', 'subtype']
+        data_list = db.session.execute(sql)
         messes = []
-        for datas in data_list:
+        for data in data_list:
             mess = {}
-            for x in range(len(datas)):
-                mess[descnames[x]] = datas[x]
+            for x in range(len(data)):
+                mess[desc_names[x]] = data[x]
             messes.append(mess)
         return messes
 
     def main(self):
-        datav = Getbookid.findallbookid(self)
+        data_book = self.find_all_book_id()
         traceId = getTraceId()
-        data = {}
+        data = dict()
         data['traceId'] = traceId
         data['code'] = 200
-        data['data'] = datav
+        data['data'] = data_book
         data['msg'] = 'Successful!'
-        logInfo = str(data['code'])+'['+ traceId + ']type[getBookid]' + 'scid[All]'
+        logInfo = str(data['code']) + '[' + traceId + ']type[getBookid]' + 'scid[All]'
         log('APIRequest-', logInfo)
         # log('logInfo:Getbookid - ', data['code'])
         return data
@@ -261,7 +263,7 @@ class GetStwInfo(StwInfoBase):
     def get_king_info(self):
         # 数据拉取的主函数
         desc_names = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'bookid', 'bookname',
-                'countscore', 'numhomework', 'numselfwork','topicnum', 'countright', 'rightlv', 'counttime', 'topicold']
+            'countscore', 'numhomework', 'numselfwork','topicnum', 'countright', 'rightlv', 'counttime', 'topicold']
         subtype_result = self.get_sub_type()
         if subtype_result == 1:
             if not self.class_id or self.class_id == 0:
@@ -350,82 +352,87 @@ class GetStwInfo(StwInfoBase):
         traceId = getTraceId()
         data = dict()
         data['traceId'] = traceId
-        if check_school_result is True and check_book_result is True:
+        if check_school_result and check_book_result:
             data['code'] = 200
             data['data'] = GetStwInfo.get_king_info(self)
             data['msg'] = 'Successful!'
         else:
             data['code'] = 400
             data['msg'] = 'These schools or books are not exist!'
-        logInfo = str(data['code']) + '[' + traceId + ']type[getStwinfo]' + 'scid[' + self.school_id + ']'\
-                  + 'sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']' + 'bkid[' +\
-                str(self.book_id) + ']' + 'clid[' + str(self.class_id) + ']'
+        logInfo = str(data['code']) + '[' + traceId + ']type[getStwinfo]' + 'scid[' + self.school_id + ']' +\
+                    'sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']' + 'bkid[' +\
+                    str(self.book_id) + ']' + 'clid[' + str(self.class_id) + ']'
         log('APIRequest-', logInfo)
         return data
 
 
-class GetstwStudent(StwInfoBase):
+class GetStwStudent(StwInfoBase):
 
-    def getstwstudent(self):
+    def get_stw_student(self):
         subpart = {'语文': 1, '数学': 2, '英语': 3, '科学': 4, '历史': 5, '道德与法治': 6, '物理': 7}
+        global subject_id
         subject_id = subpart.get(self.subject_name)
-        self.alldescs = ['userid', 'username']
         descnames=['userid', 'username', 'oldtopicnum', 'topicnum', 'rightnum']
-        sql="SELECT userid,username,SUM(oldtopicnum)AS `oldtopicnum`,SUM(topicnum)AS `topicnum`,sum(countright)AS rightnum FROM product_stw_subcount " \
-            "WHERE classid = %s AND subjectid = %s AND unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s GROUP BY userid,username"\
-            % (self.classid, subject_id, self.starttime, self.endedtime)
+        sql = "SELECT userid,username,SUM(oldtopicnum)AS `oldtopicnum`,SUM(topicnum)AS `topicnum`,sum(countright)AS rightnum FROM product_stw_subcount " \
+                "WHERE classid = %s AND subjectid = %s AND unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s GROUP BY userid,username"\
+                % (self.class_id, subject_id, self.start_time, self.end_time)
         data_list = db.session.execute(sql)
         messes = []
-        for datas in data_list:
+        for data in data_list:
             mess = {}
-            for x in range(len(datas)):
-                mess[descnames[x]] = datas[x]
-            mess['rightrate']=int((mess['rightnum']/mess['topicnum'])*10000)/100
+            for x in range(len(data)):
+                mess[descnames[x]] = data[x]
+            mess['rightrate'] = int((mess['rightnum']/mess['topicnum'])*10000)/100
             messes.append(mess)
-        allmesses = self.get_all_user()
-        findescnames = ['userid', 'username', 'topicnum', 'rightnum', 'rightrate']
-        alldatas = []
-        for allmess in allmesses:
-            for rdataf in messes:
-                if str(rdataf["userid"]) == str(allmess["userid"]):
-                    allmess["username"] = rdataf["username"]
-                    allmess["topicnum"] = rdataf["oldtopicnum"]*10
-                    allmess["rightnum"] = rdataf["rightnum"]
-                    allmess["rightrate"] = rdataf["rightrate"]
-            if len(allmess) == len(self.alldescs):
-                allmess["topicnum"]=allmess["rightnum"]=allmess["rightrate"]=0
-                # for findena in findescnames:
-                #     allmess[findena] = 0
-            alldatas.append(allmess)
-        return alldatas
+        all_messes = self.get_all_user()
+        all_data = []
+        for all_mess in all_messes:
+            all_mess["topicnum"] = all_mess["rightnum"] = all_mess["rightrate"] = 0
+            for req_data in messes:
+                if str(req_data["userid"]) == str(all_mess["userid"]):
+                    all_mess["topicnum"] = req_data["oldtopicnum"] * 10
+                    all_mess["rightnum"] = req_data["rightnum"]
+                    all_mess["rightrate"] = req_data["rightrate"]
+            all_data.append(all_mess)
+        return all_data
+
+    def check_class_id(self):
+        # 检查班级ID是否存在
+        sql = "select distinct classid from product_stw_daycount where classid in (%s) \
+                and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
+                self.class_id, self.start_time, self.end_time)
+        rs = db.session.execute(sql)
+        if len([chrs for chrs in rs]) > 0:
+            return True
+        return False
 
     def main(self):
-        self.checkclassid()
+        check_class = self.check_class_id()
         traceId = getTraceId()
-        if self.classid and self.schoolid and self.subjectid:
-            if self.checkclid == 'right':
-                datav = self.getstwstudent()
+        if self.class_id and self.school_id and subject_id:
+            if check_class:
+                datav = self.get_stw_student()
                 codenum = 200
                 messa='successful!'
             else:
                 datav = 'No data!'
                 codenum = 400
                 messa = 'Error, Classid not exists!'
-            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'scid['+ str(self.schoolid)+ ']classid['+ str(self.classid) +\
-                      ']subjectid['+ str(self.subjectid) + ']sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
-        elif not self.classid or not self.schoolid:
+            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'scid[' + str(self.school_id) + ']classid['+ str(self.class_id) +\
+                        ']subjectid[' + str(subject_id) + ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
+        elif not self.class_id or not self.school_id:
             datav = 'No data!'
             codenum = 400
             messa = 'Classid or schoolid not exists!'
-            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]subname[' + str(self.subjectname) + \
-                      ']sttime['+ str(self.starttime) +']'+ 'endtime['+ str(self.endedtime) + ']'
-        elif not self.subjectid:
+            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]subname[' + str(self.subject_name) + \
+                      ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
+        elif not subject_id:
             datav = 'No data!'
             codenum = 400
             messa = 'SubjectName not exists!'
-            logInfo = str(codenum) + '[' +traceId + ']type[getStudent]subname[' + str(self.subjectname) + \
-                      ']sttime[' + str(self.starttime) + ']' + 'endtime[' + str(self.endedtime) + ']'
-        data = {}
+            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]subname[' + str(self.subject_name) + \
+                      ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
+        data = dict()
         data['traceId'] = traceId
         data['code'] = codenum
         data['data'] = datav
@@ -435,9 +442,9 @@ class GetstwStudent(StwInfoBase):
         return data
 
 
-@getStwInfoRecode.route('/getid', methods=['GET'])
+@getStwInfo.route('/getid', methods=['GET'])
 @cache.cached(timeout=10, key_prefix='view_%s', unless=None)
-def getid():
+def get_id():
     print("cachetest")
     return jsonify({'test success': 1131231})
 
