@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, request, jsonify
 from app import app, cache
 from .relog import log
 #from .models import Stwdaycount
-import json,time,requests
+import json, time, requests
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
 
@@ -30,7 +30,7 @@ def get_stw_info():
         if request.method == 'GET':
             return jsonify({'msg': "Error.You should change the Method to 'Post'!", 'Code': 200, })
         if gettype == 'getbookid':
-            s = Getbookid(schoolid)
+            s = Getbookid()
         elif gettype == 'getstudent':
             s = GetStwStudent(school_id=schoolid, start_time=starttime, end_time=endedtime,
                               subject_name=subjectname, class_id=classid)
@@ -94,6 +94,8 @@ class StwInfoBase(object):
         self.subject_name = kwargs.get('subject_name', '')
         self.start_time = kwargs.get('start_time', int(time.time()) - 24*60*60*8)
         self.end_time = kwargs.get('end_time', int(time.time()))
+        subpart = {'语文': 1, '数学': 2, '英语': 3, '科学': 4, '历史': 5, '道德与法治': 6, '物理': 7}
+        self.subject_id = subpart.get(self.subject_name)
 
     def check_school_id(self):
         # 检查学校ID
@@ -125,7 +127,7 @@ class StwInfoBase(object):
                          "WHERE classname!='教师' AND schoolid IN (%s)" % school_id
             else:
                 sql = "SELECT DISTINCT userid,username,schoolid,classname FROM teacher_student_info  " \
-                         "WHERE classname!='教师' AND schoolid IN (%s) and classid IN (%s)" % (school_id, class_id)
+                         "WHERE classname!='教师' AND classid IN (%s)" % class_id
             data_lists = db.session.execute(sql)
             messes = []
             for data in data_lists:
@@ -220,8 +222,8 @@ class StwInfoBase(object):
         return get_live_student_integral(self.school_id, self.class_id, self.book_id, self.start_time, self.end_time)
 
     def get_sub_type(self):
-        sqlsel = "SELECT DISTINCT subtype FROM product_stw_subject WHERE bookid IN ('%s')" % self.book_id
-        data_list = db.session.execute(sqlsel)
+        sql = "SELECT DISTINCT subtype FROM product_stw_subject WHERE bookid IN ('%s')" % self.book_id
+        data_list = db.session.execute(sql)
         for x in data_list:
             data = x[0]
             return data
@@ -230,7 +232,7 @@ class StwInfoBase(object):
 
 
 class Getbookid(object):
-
+    @cache.cached(timeout=3600*12, key_prefix='book_id')
     def find_all_book_id(self):
         # 获取所有书本ID对应书名
         sql = "select distinct bookname,bookid,subtype from product_stw_subject"
@@ -301,23 +303,33 @@ class GetStwInfo(StwInfoBase):
             mess = {}
             for x in range(len(data)):
                 mess[desc_names[x]] = data[x]
+                book_name = mess.get('bookname')
             messes.append(mess)
+        sta1 = time.time()
         try:
             live_hp_data = self.get_live_hp()
         except:
             live_hp_data = []
+        end1 = time.time()
+        sta2 = time.time()
         try:
             live_integral_data = self.get_live_integral()
         except:
             live_integral_data = []
+        end2 = time.time()
+        sta3 = time.time()
         all_user_data = self.get_all_user()
+        end3 = time.time()
+        log('live_hp-', end1-sta1, 'live_integral-', end2 - sta2, 'live_all_user-', end3 - sta3,)
         values = []
         for user_data in all_user_data:
             user_data["hp"] = 0
             user_data["credit"] = 0
             user_data["integral"] = 0
+            user_data['bookname'] = book_name
+            for desc_name in desc_names[7:]:
+                user_data[desc_name] = 0
             for m in messes:
-                book_name = m['bookname']
                 if str(m["userid"]) == str(user_data["userid"]):
                     user_data["countscore"] = m["countscore"]
                     user_data["numhomework"] = m["numhomework"]
@@ -327,21 +339,13 @@ class GetStwInfo(StwInfoBase):
                     user_data["rightlv"] = m["rightlv"]
                     user_data["counttime"] = m["counttime"]
                     user_data["topicold"] = m["topicold"]
-                else:
-                    for desc_name in desc_names[7:]:
-                        user_data[desc_name] = 0
             for hp_data in live_hp_data:
                 if str(hp_data['studentId']) == str(user_data["userid"]):
                     user_data["hp"] = hp_data["hp"]
                     user_data["credit"] = hp_data["credit"]
-                else:
-                    user_data["hp"] = user_data["credit"] = 0
             for integral_data in live_integral_data:
                 if str(user_data['userid']) == str(integral_data['studentId']):
                     user_data["integral"] = integral_data["integral"]
-                else:
-                    user_data["integral"] = 0
-            user_data['bookname'] = book_name
             values.append(user_data)
         return values
 
@@ -369,13 +373,10 @@ class GetStwInfo(StwInfoBase):
 class GetStwStudent(StwInfoBase):
 
     def get_stw_student(self):
-        subpart = {'语文': 1, '数学': 2, '英语': 3, '科学': 4, '历史': 5, '道德与法治': 6, '物理': 7}
-        global subject_id
-        subject_id = subpart.get(self.subject_name)
         descnames=['userid', 'username', 'oldtopicnum', 'topicnum', 'rightnum']
         sql = "SELECT userid,username,SUM(oldtopicnum)AS `oldtopicnum`,SUM(topicnum)AS `topicnum`,sum(countright)AS rightnum FROM product_stw_subcount " \
                 "WHERE classid = %s AND subjectid = %s AND unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s GROUP BY userid,username"\
-                % (self.class_id, subject_id, self.start_time, self.end_time)
+                % (self.class_id, self.subject_id, self.start_time, self.end_time)
         data_list = db.session.execute(sql)
         messes = []
         for data in data_list:
@@ -398,18 +399,22 @@ class GetStwStudent(StwInfoBase):
 
     def check_class_id(self):
         # 检查班级ID是否存在
-        sql = "select distinct classid from product_stw_daycount where classid in (%s) \
-                and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
-                self.class_id, self.start_time, self.end_time)
-        rs = db.session.execute(sql)
-        if len([chrs for chrs in rs]) > 0:
-            return True
+        if self.class_id:
+            sql = "select distinct classid from product_stw_daycount where classid in (%s) \
+                    and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
+                    self.class_id, self.start_time, self.end_time)
+            try:
+                rs = db.session.execute(sql)
+            except:
+                return False
+            if len([chrs for chrs in rs]) > 0:
+                return True
         return False
 
     def main(self):
         check_class = self.check_class_id()
         traceId = getTraceId()
-        if self.class_id and self.school_id and subject_id:
+        if self.class_id and self.school_id and self.subject_id:
             if check_class:
                 datav = self.get_stw_student()
                 codenum = 200
@@ -419,14 +424,14 @@ class GetStwStudent(StwInfoBase):
                 codenum = 400
                 messa = 'Error, Classid not exists!'
             logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'scid[' + str(self.school_id) + ']classid['+ str(self.class_id) +\
-                        ']subjectid[' + str(subject_id) + ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
+                        ']subjectid[' + str(self.subject_id) + ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
         elif not self.class_id or not self.school_id:
             datav = 'No data!'
             codenum = 400
             messa = 'Classid or schoolid not exists!'
             logInfo = str(codenum) + '[' + traceId + ']type[getStudent]subname[' + str(self.subject_name) + \
                       ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
-        elif not subject_id:
+        elif not self.subject_id:
             datav = 'No data!'
             codenum = 400
             messa = 'SubjectName not exists!'
