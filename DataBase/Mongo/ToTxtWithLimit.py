@@ -48,3 +48,16 @@ while i < int(result_num/limit_num)+1:
     i +=1
 fileObject.close()
 
+
+# 内部包含数组方法
+for result in results:
+    id_key = result['_id']  # 局ID
+    for x in result['questionList']:
+        values = list()
+        values.append(str(id_key))
+        values.append(str(x['questionId']))
+        messes = '\t'.join(values) + '\n'
+        all_mess += messes
+fileObject.write(all_mess)  # 等待本次结果集循环结束，一次性插入限定条数的数据
+#    i += 1
+fileObject.close()
