@@ -21,5 +21,5 @@ for i in range(int(result_num/limit_num)+1):  # 总条数对应限定查询条�
         values.append(str(result['updateTime']))  # 更新时间
         messes = '\t'.join(values) + '\n'
         all_mess += messes
-    fileObject.write(messes)  # 等待本次结果集循环结束，一次性插入限定条数的数据
+    fileObject.write(all_mess)  # 等待本次结果集循环结束，一次性插入限定条数的数据
 fileObject.close()
