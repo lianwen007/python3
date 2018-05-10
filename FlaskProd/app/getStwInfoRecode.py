@@ -88,8 +88,8 @@ def stw_cache_clear():
 class StwInfoBase(object):
     # 刷题王数据拉取的父类
     def __init__(self, *args, **kwargs):
-        self.school_id = kwargs.get('school_id', '')
-        self.class_id = kwargs.get('class_id', 0)
+        self.school_id = str(kwargs.get('school_id', ''))
+        self.class_id = str(kwargs.get('class_id', 0))
         self.book_id = kwargs.get('book_id', '')
         self.subject_name = kwargs.get('subject_name', '')
         self.start_time = kwargs.get('start_time', int(time.time()) - 24*60*60*8)
@@ -173,7 +173,6 @@ class StwInfoBase(object):
             except TimeoutError or ValueError:
                 req_data = []
             return req_data
-
         return get_live_student_hp(self.school_id, self.class_id)
 
     def get_live_integral(self):
@@ -231,10 +230,10 @@ class StwInfoBase(object):
             return 1
 
 
-class Getbookid(object):
+class Getbookid(StwInfoBase):
     @cache.cached(timeout=3600*12, key_prefix='book_id')
     def find_all_book_id(self):
-        # 获取所有书本ID对应书名
+        # 获取所有书本ID对应书名和书本规则列表
         sql = "select distinct bookname,bookid,subtype from product_stw_subject"
         desc_names = ['bookname', 'bookid', 'subtype']
         data_list = db.session.execute(sql)
@@ -267,43 +266,42 @@ class GetStwInfo(StwInfoBase):
         desc_names = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'bookid', 'bookname',
             'countscore', 'numhomework', 'numselfwork','topicnum', 'countright', 'rightlv', 'counttime', 'topicold']
         subtype_result = self.get_sub_type()
-        if subtype_result == 1:
+        if subtype_result == 2:
             if not self.class_id or self.class_id == 0:
-                sql = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
-                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(countright)*100/SUM(topicnum)AS SIGNED),\
-                        CAST(SUM(counttime)/(SUM(numhomework)+SUM(numselfwork))AS SIGNED),CAST((SUM(numhomework)+SUM(numselfwork))*10 AS SIGNED) \
-                        FROM product_stw_daycount WHERE schoolid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
-                         % (self.school_id, self.start_time, self.end_time, self.book_id)
-            else:
-                sql = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
-                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(countright)*100/SUM(topicnum)AS SIGNED),\
-                        CAST(SUM(counttime)/(SUM(numhomework)+SUM(numselfwork))AS SIGNED),CAST((SUM(numhomework)+SUM(numselfwork))*10 AS SIGNED) \
-                        FROM product_stw_daycount WHERE classid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
-                         % (self.class_id, self.start_time, self.end_time, self.book_id)
-        elif subtype_result == 2:
-            if not self.class_id or self.class_id == 0:
-                sql = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
-                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)/10 AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(rightlv)/SUM(topicnum)AS SIGNED),\
+                sql_select = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
+                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)/10 AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(rightlv)*10/SUM(topicnum)AS SIGNED),\
                         CAST(SUM(counttime)*10/(SUM(topicnum))AS SIGNED),CAST(SUM(numhomework)+SUM(numselfwork)AS SIGNED) \
                         FROM product_stw_daycount WHERE schoolid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
                         AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
                          % (self.school_id, self.start_time, self.end_time, self.book_id)
             else:
-                sql = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
-                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)/10 AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(rightlv)/SUM(topicnum)AS SIGNED),\
+                sql_select = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
+                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)/10 AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(rightlv)*10/SUM(topicnum)AS SIGNED),\
                         CAST(SUM(counttime)*10/(SUM(topicnum))AS SIGNED),CAST(SUM(numhomework)+SUM(numselfwork)AS SIGNED)\
                         FROM product_stw_daycount WHERE classid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
                         AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
                          % (self.class_id, self.start_time, self.end_time, self.book_id)
-        data_list = db.session.execute(sql)
+        else:
+            if not self.class_id or self.class_id == 0:
+                sql_select = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
+                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(countright)*100/SUM(topicnum)AS SIGNED),\
+                        CAST(SUM(counttime)/(SUM(numhomework)+SUM(numselfwork))AS SIGNED),CAST((SUM(numhomework)+SUM(numselfwork))*10 AS SIGNED) \
+                        FROM product_stw_daycount WHERE schoolid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
+                        AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
+                         % (self.school_id, self.start_time, self.end_time, self.book_id)
+            else:
+                sql_select = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
+                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(countright)*100/SUM(topicnum)AS SIGNED),\
+                        CAST(SUM(counttime)/(SUM(numhomework)+SUM(numselfwork))AS SIGNED),CAST((SUM(numhomework)+SUM(numselfwork))*10 AS SIGNED) \
+                        FROM product_stw_daycount WHERE classid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
+                        AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
+                         % (self.class_id, self.start_time, self.end_time, self.book_id)
+        data_list = db.session.execute(sql_select)
         messes = []
         for data in data_list:
             mess = {}
             for x in range(len(data)):
                 mess[desc_names[x]] = data[x]
-                book_name = mess.get('bookname')
             messes.append(mess)
         sta1 = time.time()
         try:
@@ -322,6 +320,7 @@ class GetStwInfo(StwInfoBase):
         end3 = time.time()
         log('live_hp-', end1-sta1, 'live_integral-', end2 - sta2, 'live_all_user-', end3 - sta3,)
         values = []
+        book_name = self.find_book_name_byid()
         for user_data in all_user_data:
             user_data["hp"] = 0
             user_data["credit"] = 0
@@ -348,6 +347,14 @@ class GetStwInfo(StwInfoBase):
                     user_data["integral"] = integral_data["integral"]
             values.append(user_data)
         return values
+
+    def find_book_name_byid(self):
+        # 获取书本ID对应书名
+        sql = "select distinct bookname from product_stw_subject WHERE bookid ='%s'" % self.book_id
+        data_list = db.session.execute(sql)
+        for data in data_list:
+            mess = data[0]
+        return mess
 
     def main(self):
         #  判定有学校ID和对应的书本ID后，再执行数据拉取，并写入日志
