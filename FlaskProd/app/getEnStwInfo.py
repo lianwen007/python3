@@ -89,14 +89,14 @@ class GetEnStwInfo(object):
             sqlsel = "SELECT userid,username,schoolid,classid,classname,CAST(SUM(gamecount)AS SIGNED),CAST(SUM(finishcount)AS SIGNED),\
             CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listenfull)AS SIGNED),\
             CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(listenrate)AS SIGNED),CAST(AVG(readrate)AS SIGNED),\
-            CAST(AVG(blankrate)AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST((SUM(rateavg)/(SUM(gamecount)+SUM(selfcount)))AS SIGNED)\
+            CAST(AVG(blankrate)AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST(AVG(rateavg)AS SIGNED)\
             FROM product_stw_encount WHERE schoolid=%s AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
                  % (self.schoolid, self.starttime, self.endedtime)
         else:
             sqlsel = "SELECT userid,username,schoolid,classid,classname,CAST(SUM(gamecount)AS SIGNED),CAST(SUM(finishcount)AS SIGNED),\
                           CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listenfull)AS SIGNED),\
             CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(listenrate)AS SIGNED),CAST(AVG(readrate)AS SIGNED),\
-            CAST(AVG(blankrate)AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST((SUM(rateavg)/(SUM(gamecount)+SUM(selfcount)))AS SIGNED)\
+            CAST(AVG(blankrate)AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST(AVG(rateavg)AS SIGNED)\
              FROM product_stw_encount WHERE classid=%s AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
                      % (self.classid, self.starttime, self.endedtime)
         data_list = db.session.execute(sqlsel)
