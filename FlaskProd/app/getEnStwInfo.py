@@ -14,7 +14,7 @@ def getTraceId():
 
 
 def keep_percent_point_num(num, point):
-    # 小数化为百分比，并保留小数位数
+    # 小数化为百分比，并保留小数位数 num :原数 point:保留位数
     return int(num*10**(point+2))/10**point
 
 
@@ -88,15 +88,15 @@ class GetEnStwInfo(object):
         if not self.classid or self.classid == '0':
             sqlsel = "SELECT userid,username,schoolid,classid,classname,CAST(SUM(gamecount)AS SIGNED),CAST(SUM(finishcount)AS SIGNED),\
             CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listenfull)AS SIGNED),\
-            CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(listenrate)AS SIGNED),CAST(AVG(readrate)AS SIGNED),\
-            CAST(AVG(blankrate)AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST(AVG(rateavg)AS SIGNED)\
+            CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(IF(listennum>0,listenrate,NULL))AS SIGNED),CAST(AVG(IF(readnum>0,readrate,NULL))AS SIGNED),\
+            CAST(AVG(IF(blanknum>0,blankrate,NULL))AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST(AVG(rateavg)AS SIGNED)\
             FROM product_stw_encount WHERE schoolid=%s AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
                  % (self.schoolid, self.starttime, self.endedtime)
         else:
             sqlsel = "SELECT userid,username,schoolid,classid,classname,CAST(SUM(gamecount)AS SIGNED),CAST(SUM(finishcount)AS SIGNED),\
-                          CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listenfull)AS SIGNED),\
-            CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(listenrate)AS SIGNED),CAST(AVG(readrate)AS SIGNED),\
-            CAST(AVG(blankrate)AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST(AVG(rateavg)AS SIGNED)\
+             CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listenfull)AS SIGNED),\
+            CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(IF(listennum>0,listenrate,NULL))AS SIGNED),CAST(AVG(IF(readnum>0,readrate,NULL))AS SIGNED),\
+            CAST(AVG(IF(blanknum>0,blankrate,NULL))AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST(AVG(rateavg)AS SIGNED)\
              FROM product_stw_encount WHERE classid=%s AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
                      % (self.classid, self.starttime, self.endedtime)
         data_list = db.session.execute(sqlsel)
