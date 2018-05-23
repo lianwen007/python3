@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, request, jsonify
+from flask import Blueprint, request, jsonify
 from app import app, cache
 from .relog import log
 
@@ -23,9 +23,15 @@ def get_qst_num():
         class_id = request.values.get('classId', 0)
         subject_id = request.values.get('subjectId', 0)
         # user_id = request.values.get('user_id') #支持获取连接拼接的参数，而且还能获取body form填入的参数
+        trace_id = get_trace_id()
         if not school_id or class_id == 0 or subject_id == 0:
-            trace_id = get_trace_id()
             mess = {'code': 400, 'msg': 'Please enter the correct school, class and subject!', 'traceId': trace_id}
+            log_info = '400' + '[' + trace_id + ']type[getQstNum]' + 'scid[0]clid[0]' + 'start[' + \
+                       str(start_time) + ']end[' + str(end_time) + ']'
+            log('APIRequest-', log_info)
+            return jsonify(mess)
+        if not start_time or not end_time:
+            mess = {'code': 400, 'msg': 'Please enter the correct time!', 'traceId': trace_id}
             log_info = '400' + '[' + trace_id + ']type[getQstNum]' + 'scid[0]clid[0]' + 'start[' + \
                        str(start_time) + ']end[' + str(end_time) + ']'
             log('APIRequest-', log_info)
@@ -104,7 +110,7 @@ class GetQuestionNum(QuestionNumBase):
                     if str(m["userId"]) == str(user_data["userId"]):
                         user_data['qstNum'] = int(m['qstNum'])
                         user_data['rightRate'] = str(int(m['rightRate']*10)/10) + '%'
-                        user_data['subjectId'] = m['subjectId']
+                        user_data['subjectId'] = int(m['subjectId'])
                 values.append(user_data)
             return values
         else:
