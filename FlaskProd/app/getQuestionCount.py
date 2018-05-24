@@ -30,7 +30,7 @@ def get_qst_num():
                        str(start_time) + ']end[' + str(end_time) + ']'
             log('APIRequest-', log_info)
             return jsonify(mess)
-        if not start_time or not end_time:
+        elif not start_time or not end_time:
             mess = {'code': 400, 'msg': 'Please enter the correct time!', 'traceId': trace_id}
             log_info = '400' + '[' + trace_id + ']type[getQstNum]' + 'scid[0]clid[0]' + 'start[' + \
                        str(start_time) + ']end[' + str(end_time) + ']'
