@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify
 from app import app, cache
 from .relog import log
-
 import time
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError
 db = SQLAlchemy(app)
 
 getQstCount = Blueprint('getQstCount', __name__)
@@ -55,10 +55,12 @@ class QuestionNumBase(object):
 
     def check_school_class_id(self):
         # 检查学校ID 和班级ID
-        sql = "SELECT DISTINCT school_id FROM product_qst_count WHERE school_id in (%s) AND class_id in (%s)\
-                        AND (unix_timestamp(`date_time`)>=%s AND unix_timestamp(`date_time`)<=%s)" % (
-            self.school_id, self.class_id, self.start_time, self.end_time)
-        rs = db.session.execute(sql)
+        sql = "SELECT DISTINCT school_id FROM product_qst_count WHERE school_id in (%s) AND class_id in (%s)" \
+              % (self.school_id, self.class_id)
+        try:
+            rs = db.session.execute(sql)
+        except:
+            rs = tuple()
         if len([i for i in rs]) > 0:
             return True
         return False
@@ -92,7 +94,10 @@ class GetQuestionNum(QuestionNumBase):
               FROM product_qst_count WHERE subject_id = '%s' AND school_id='%s' AND class_id='%s' AND \
               (unix_timestamp(`date_time`)>=%s AND unix_timestamp(`date_time`)<=%s) GROUP BY user_id,user_name,class_id,class_name,subject_id"\
                 % (self.subject_id, self.school_id, self.class_id, self.start_time, self.end_time)
-        data_list = db.session.execute(sql_select)
+        try:
+            data_list = db.session.execute(sql_select)
+        except:
+            data_list = tuple()
         messes = list()
         for data in data_list:
             mess = dict()
