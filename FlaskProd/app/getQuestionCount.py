@@ -3,7 +3,6 @@ from app import app, cache
 from .relog import log
 import time
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.exc import IntegrityError
 db = SQLAlchemy(app)
 
 getQstCount = Blueprint('getQstCount', __name__)
@@ -55,11 +54,12 @@ class QuestionNumBase(object):
 
     def check_school_class_id(self):
         # 检查学校ID 和班级ID
-        sql = "SELECT DISTINCT school_id FROM product_qst_count WHERE school_id in (%s) AND class_id in (%s)" \
+        sql = "SELECT DISTINCT schoolid FROM teacher_student_info WHERE schoolid in (%s) AND classid in (%s)"\
               % (self.school_id, self.class_id)
         try:
             rs = db.session.execute(sql)
-        except:
+        except Exception as e:
+            log('Error[getQstNum]-[check_school_class_id]', e)
             rs = tuple()
         if len([i for i in rs]) > 0:
             return True
@@ -76,10 +76,14 @@ class QuestionNumBase(object):
             else:
                 sql = "SELECT DISTINCT userid,username,classid,classname FROM teacher_student_info  " \
                          "WHERE classname!='教师' AND classid IN (%s)" % class_id
-            data_lists = db.session.execute(sql)
-            messes = []
+            try:
+                data_lists = db.session.execute(sql)
+            except Exception as e:
+                log('Error[getQstNum]-[get_all_user]', e)
+                data_lists = list()
+            messes = list()
             for data in data_lists:
-                mess = {}
+                mess = dict()
                 for x in range(len(data)):
                     mess[names[x]] = data[x]
                 messes.append(mess)
@@ -96,13 +100,17 @@ class GetQuestionNum(QuestionNumBase):
                 % (self.subject_id, self.school_id, self.class_id, self.start_time, self.end_time)
         try:
             data_list = db.session.execute(sql_select)
-        except:
+        except Exception as e:
+            log('Error[getQstNum]-[get_qst_count]', e)
             data_list = tuple()
         messes = list()
         for data in data_list:
             mess = dict()
             for x in range(len(data)):
                 mess[desc_names[x]] = data[x]
+            mess['subjectId'] = int(mess['subjectId'])
+            mess['rightRate'] = str(int(mess['rightRate']*10)/10) + '%'
+            mess['qstNum'] = int(mess['qstNum'])
             messes.append(mess)
         values = list()
         all_user_data = self.get_all_user()
@@ -113,9 +121,9 @@ class GetQuestionNum(QuestionNumBase):
                 user_data['subjectId'] = 0
                 for m in messes:
                     if str(m["userId"]) == str(user_data["userId"]):
-                        user_data['qstNum'] = int(m['qstNum'])
-                        user_data['rightRate'] = str(int(m['rightRate']*10)/10) + '%'
-                        user_data['subjectId'] = int(m['subjectId'])
+                        user_data['qstNum'] = m['qstNum']
+                        user_data['rightRate'] = m['rightRate']
+                        user_data['subjectId'] = m['subjectId']
                 values.append(user_data)
             return values
         else:
