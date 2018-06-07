@@ -1,27 +1,50 @@
+# http://flask-restplus.readthedocs.io/en/latest/swagger.html
+
 from flask import Blueprint
-from flask_restplus import Resource, fields
+from flask_restplus import Resource, fields, marshal, apidoc
 from flask_restplus import Api
 swagger = Blueprint('swagger', __name__)
 swagger_api = Api(swagger, doc='/swagger-ui.html', version='1.0',
-                  title='大数据接口', description='大数据接口服务',
+                  title='BigData APIs', description='BigData APIs Service',
                   contact='adminLwc', contact_email='lwc@100fen.cn',
-                  catch_all_404s=True, default='接口健康', default_label='Health'
+                  catch_all_404s=True, default='ApiHealth', default_label='Health'
                   )
+
+@swagger_api.documentation
+def custom_ui():
+    return apidoc.ui_for(swagger_api)
+
 
 ns = swagger_api.namespace('Todos', description='TODO operations')
 
-todo = swagger_api.model('Todo', {
-    'id': fields.Integer(readOnly=True, description='The task unique identifier'),
-    'task': fields.String(required=True, description='The task details'),
-    'gra': fields.String(required=True, description='gra')
+parent = swagger_api.model('Parent', {
+    'name': fields.String,
+    'class': fields.String(discriminator=True)
 })
+#
+# child = api.inherit('Child', parent, {
+#     'extra': fields.String
+# })
+todo = swagger_api.inherit('Todo', parent, {
+    'id': fields.Integer(required=True, description='The task unique identifier'),
+    'task': fields.String(required=True, description='The task details'),
+    #'aaaa':parent,
+    # 'gra': fields.List(required=True, description='bbb', cls_or_instance=mfields)
+})
+# child = api.inherit('Child', parent, {
+#     'extra': fields.String
+# })
+# mfields = {'a': fields.Integer, 'c': fields.Integer, 'd': fields.Integer}
+# asd = marshal(data, mfields, envelope='data')
+# print(asd)
+
 
 
 @swagger_api.route('/api/health')
 class GetHealth(Resource):
     @staticmethod
     def get():
-        """接口健康"""
+        """APIs Health"""
         return {'status': 'up'}
 
 
@@ -78,7 +101,7 @@ class TodoList(Resource):
 @ns.route('/<int:id>')
 @ns.response(404, 'Todo not found')
 @ns.doc(params={'asd': 'asd'})  # 可以为空
-@ns.param('aaaa', 'Aaaaa', required=True, type='integer')  # 指定非空和类型
+@ns.param('aaaa', 'Aaaaa', required=True, type='integer', default='123')  # 指定非空和类型
 class Todo(Resource):
     '''Show a single todo item and lets you delete them'''
     @ns.doc('get_todo')
