@@ -25,10 +25,10 @@ parent = swagger_api.model('Parent', {
 # child = api.inherit('Child', parent, {
 #     'extra': fields.String
 # })
-todo = swagger_api.inherit('Todo', parent, {
+todo = swagger_api.model('Todo', parent, {
     'id': fields.Integer(required=True, description='The task unique identifier'),
     'task': fields.String(required=True, description='The task details'),
-    #'aaaa':parent,
+    'aaaa': fields.List(fields.Nested(parent))
     # 'gra': fields.List(required=True, description='bbb', cls_or_instance=mfields)
 })
 # child = api.inherit('Child', parent, {
