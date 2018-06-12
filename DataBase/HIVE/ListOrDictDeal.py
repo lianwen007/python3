@@ -40,23 +40,25 @@ for v in sys.stdin:
         try:
             results = ast.literal_eval(value)
         except:
-            results = dict()
+            continue
         all_mess = ''
         if results:
             if type(results) == type(list()):
                 for x in results:
                     all_mess = all_mess + str(x) + '@' 
                 print (all_mess.rstrip('@'))
-            else:
+            elif type(results) == type(dict()):
                 for x in results:
                     d = dict()
                     d[x] = results[x]
                     all_mess = all_mess + str(d) + '@' 
                 print (all_mess.rstrip('@'))
+            else:
+                print(all_mess)
         else:
-            pass
+            continue
     else:
-        pass
+        continue
 #
 #
 #
