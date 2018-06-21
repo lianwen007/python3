@@ -43,6 +43,20 @@ def get_stw_info():
         data = {"code": "405", "msg": "Values error, Check your 'Content-Type' first!"}
         return jsonify(data)
 
+@getStwInfo.route('/getBook/subject', methods=['GET'], endpoint='subject')
+def get_stw_book_subject():
+    subject_id = request.values.get('subjectId')
+    if subject_id:
+        s = Getbookid(subject_book=subject_id)
+        return jsonify(s.main())
+    else:
+        data = [{'subjectId': 2, 'subjectName': '数学', 'subType': 1},
+                {'subjectId': 3, 'subjectName': '英语', 'subType': 2},
+                {'subjectId': 4, 'subjectName': '科学', 'subType': 1},
+                {'subjectId': 5, 'subjectName': '历史与社会', 'subType': 3},
+                {'subjectId': 6, 'subjectName': '道德与法治', 'subType': 3}]
+        return jsonify(data)
+  
 
 @getStwInfo.route('/getLiveHp', methods=['GET'])
 def get_stw_live_hp():
