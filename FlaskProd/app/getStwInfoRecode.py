@@ -22,12 +22,12 @@ def get_stw_info():
             schoolid = request.json.get('schoolid')  # 获取带json串请求的schoolid参数传入的值
             starttime = request.json.get('starttime', int(time.time()) - 24*60*60*8)
             endedtime = request.json.get('endedtime', int(time.time()))
-            bookid = request.json.get('bookid', '%')
+            bookid = request.json.get('bookid', '')
             classid = request.json.get('classid', 0)
             gettype = request.json.get('gettype', 0)
             subjectname = request.json.get('subjectname', 'subname')
         # userid = request.values.get('userid') #支持获取连接拼接的参数，而且还能获取body form填入的参数
-        if request.method == 'GET':
+        else:
             return jsonify({'msg': "Error.You should change the Method to 'Post'!", 'Code': 200, })
         if gettype == 'getbookid':
             s = Getbookid()
@@ -43,12 +43,13 @@ def get_stw_info():
         data = {"code": "405", "msg": "Values error, Check your 'Content-Type' first!"}
         return jsonify(data)
 
+
 @getStwInfo.route('/getBook/subject', methods=['GET'], endpoint='subject')
 def get_stw_book_subject():
     subject_id = request.values.get('subjectId')
     if subject_id:
         s = Getbookid(subject_book=subject_id)
-        return jsonify(s.main())
+        return jsonify(s.main_subject())
     else:
         data = [{'subjectId': 2, 'subjectName': '数学', 'subType': 1},
                 {'subjectId': 3, 'subjectName': '英语', 'subType': 2},
@@ -56,7 +57,7 @@ def get_stw_book_subject():
                 {'subjectId': 5, 'subjectName': '历史与社会', 'subType': 3},
                 {'subjectId': 6, 'subjectName': '道德与法治', 'subType': 3}]
         return jsonify(data)
-  
+
 
 @getStwInfo.route('/getLiveHp', methods=['GET'])
 def get_stw_live_hp():
@@ -104,7 +105,12 @@ class StwInfoBase(object):
     def __init__(self, *args, **kwargs):
         self.school_id = str(kwargs.get('school_id', ''))
         self.class_id = str(kwargs.get('class_id', 0))
-        self.book_id = kwargs.get('book_id', '')
+        book_id_result = kwargs.get('book_id', '')
+        if isinstance(book_id_result, list):
+            self.book_id = str(book_id_result).replace('[', '').replace(']', '')
+        else:
+            self.book_id = '"' + str(book_id_result) + '"'
+        self.subject_book = kwargs.get('subject_book', '')
         self.subject_name = kwargs.get('subject_name', '')
         self.start_time = kwargs.get('start_time', int(time.time()) - 24*60*60*8)
         self.end_time = kwargs.get('end_time', int(time.time()))
@@ -123,7 +129,7 @@ class StwInfoBase(object):
 
     def check_book_id(self):
         # 检查书本ID是否存在
-        sql = "SELECT DISTINCT schoolid FROM product_stw_daycount WHERE schoolid in (%s) AND bookid IN ('%s') \
+        sql = "SELECT DISTINCT schoolid FROM product_stw_daycount WHERE schoolid in (%s) AND bookid IN (%s) \
                 AND (unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s)" % (
             self.school_id, self.book_id, self.start_time, self.end_time)
         rs = db.session.execute(sql)
@@ -235,7 +241,7 @@ class StwInfoBase(object):
         return get_live_student_integral(self.school_id, self.class_id, self.book_id, self.start_time, self.end_time)
 
     def get_sub_type(self):
-        sql = "SELECT DISTINCT subtype FROM product_stw_subject WHERE bookid IN ('%s')" % self.book_id
+        sql = "SELECT DISTINCT subtype FROM product_stw_subject WHERE bookid IN (%s)" % self.book_id
         data_list = db.session.execute(sql)
         for x in data_list:
             data = x[0]
@@ -259,6 +265,20 @@ class Getbookid(StwInfoBase):
             messes.append(mess)
         return messes
 
+    def find_book_id_subject(self):
+        # 根据SUBJECT 获取书本ID
+        sql = "select distinct bookname,bookid,subtype from product_stw_subject WHERE subjectid='%s'" \
+              % self.subject_book
+        desc_names = ['bookname', 'bookid', 'subtype']
+        data_list = db.session.execute(sql)
+        messes = []
+        for data in data_list:
+            mess = {}
+            for x in range(len(data)):
+                mess[desc_names[x]] = data[x]
+            messes.append(mess)
+        return messes
+
     def main(self):
         data_book = self.find_all_book_id()
         traceId = getTraceId()
@@ -267,7 +287,22 @@ class Getbookid(StwInfoBase):
         data['code'] = 200
         data['data'] = data_book
         data['msg'] = 'Successful!'
-        logInfo = str(data['code']) + '[' + traceId + ']type[getBookid]' + 'scid[All]'
+        logInfo = str(data['code']) + '[' + traceId + ']type[getBookid]' + 'scid[All]' + 'subjectId[' + \
+                  str(self.subject_book) + ']'
+        log('APIRequest-', logInfo)
+        # log('logInfo:Getbookid - ', data['code'])
+        return data
+
+    def main_subject(self):
+        data_book = self.find_book_id_subject()
+        traceId = getTraceId()
+        data = dict()
+        data['traceId'] = traceId
+        data['code'] = 200
+        data['data'] = data_book
+        data['msg'] = 'Successful!'
+        logInfo = str(data['code']) + '[' + traceId + ']type[getBookid]' + 'scid[All]' + 'subjectId[' + \
+                  str(self.subject_book) + ']'
         log('APIRequest-', logInfo)
         # log('logInfo:Getbookid - ', data['code'])
         return data
@@ -277,38 +312,38 @@ class GetStwInfo(StwInfoBase):
     # 获取数据的主类
     def get_king_info(self):
         # 数据拉取的主函数
-        desc_names = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'bookid', 'bookname',
-            'countscore', 'numhomework', 'numselfwork','topicnum', 'countright', 'rightlv', 'counttime', 'topicold']
+        desc_names = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'countscore', 'numhomework',
+                      'numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime', 'topicold']
         subtype_result = self.get_sub_type()
-        if subtype_result == 2:
+        if subtype_result == 2 or subtype_result == 5:
             if not self.class_id or self.class_id == 0:
-                sql_select = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
+                sql_select = "SELECT userid,username,schoolid,schoolname,classname,countscore,CAST(SUM(numhomework)AS SIGNED),\
                         CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)/10 AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(rightlv)*10/SUM(topicnum)AS SIGNED),\
                         CAST(SUM(counttime)*10/(SUM(topicnum))AS SIGNED),CAST(SUM(numhomework)+SUM(numselfwork)AS SIGNED) \
                         FROM product_stw_daycount WHERE schoolid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
+                        AND bookid IN (%s) GROUP BY userid,username,schoolid,schoolname,classname,countscore" \
                          % (self.school_id, self.start_time, self.end_time, self.book_id)
             else:
-                sql_select = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
+                sql_select = "SELECT userid,username,schoolid,schoolname,classname,countscore,CAST(SUM(numhomework)AS SIGNED),\
                         CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)/10 AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(rightlv)*10/SUM(topicnum)AS SIGNED),\
                         CAST(SUM(counttime)*10/(SUM(topicnum))AS SIGNED),CAST(SUM(numhomework)+SUM(numselfwork)AS SIGNED)\
                         FROM product_stw_daycount WHERE classid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
+                        AND bookid IN (%s) GROUP BY userid,username,schoolid,schoolname,classname,countscore" \
                          % (self.class_id, self.start_time, self.end_time, self.book_id)
         else:
             if not self.class_id or self.class_id == 0:
-                sql_select = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
+                sql_select = "SELECT userid,username,schoolid,schoolname,classname,countscore,CAST(SUM(numhomework)AS SIGNED),\
                         CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(countright)*100/SUM(topicnum)AS SIGNED),\
                         CAST(SUM(counttime)/(SUM(numhomework)+SUM(numselfwork))AS SIGNED),CAST((SUM(numhomework)+SUM(numselfwork))*10 AS SIGNED) \
                         FROM product_stw_daycount WHERE schoolid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
+                        AND bookid IN (%s) GROUP BY userid,username,schoolid,schoolname,classname,countscore" \
                          % (self.school_id, self.start_time, self.end_time, self.book_id)
             else:
-                sql_select = "SELECT userid,username,schoolid,schoolname,classname,bookid,bookname,countscore,CAST(SUM(numhomework)AS SIGNED),\
+                sql_select = "SELECT userid,username,schoolid,schoolname,classname,countscore,CAST(SUM(numhomework)AS SIGNED),\
                         CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(countright)*100/SUM(topicnum)AS SIGNED),\
                         CAST(SUM(counttime)/(SUM(numhomework)+SUM(numselfwork))AS SIGNED),CAST((SUM(numhomework)+SUM(numselfwork))*10 AS SIGNED) \
                         FROM product_stw_daycount WHERE classid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid LIKE '%s' GROUP BY userid,username,schoolid,schoolname,classname,bookname,countscore,bookid" \
+                        AND bookid IN (%s) GROUP BY userid,username,schoolid,schoolname,classname,countscore" \
                          % (self.class_id, self.start_time, self.end_time, self.book_id)
         data_list = db.session.execute(sql_select)
         messes = []
@@ -320,27 +355,20 @@ class GetStwInfo(StwInfoBase):
         sta1 = time.time()
         try:
             live_hp_data = self.get_live_hp()
-        except:
+        except Exception as e:
             live_hp_data = []
+            log(e)
         end1 = time.time()
-        sta2 = time.time()
-        try:
-            live_integral_data = self.get_live_integral()
-        except:
-            live_integral_data = []
-        end2 = time.time()
         sta3 = time.time()
         all_user_data = self.get_all_user()
         end3 = time.time()
-        log('live_hp-', end1-sta1, 'live_integral-', end2 - sta2, 'live_all_user-', end3 - sta3,)
+        log('live_hp-', end1-sta1, 'live_all_user-', end3 - sta3,)
         values = []
-        book_name = self.find_book_name_byid()
         for user_data in all_user_data:
             user_data["hp"] = 0
             user_data["credit"] = 0
             user_data["integral"] = 0
-            user_data['bookname'] = book_name
-            for desc_name in desc_names[7:]:
+            for desc_name in desc_names[5:]:
                 user_data[desc_name] = 0
             for m in messes:
                 if str(m["userid"]) == str(user_data["userid"]):
@@ -356,9 +384,6 @@ class GetStwInfo(StwInfoBase):
                 if str(hp_data['studentId']) == str(user_data["userid"]):
                     user_data["hp"] = hp_data["hp"]
                     user_data["credit"] = hp_data["credit"]
-            for integral_data in live_integral_data:
-                if str(user_data['userid']) == str(integral_data['studentId']):
-                    user_data["integral"] = integral_data["integral"]
             values.append(user_data)
         return values
 
@@ -443,7 +468,8 @@ class GetStwStudent(StwInfoBase):
             else:
                 datav = 'No data!'
                 codenum = 400
-                messa = 'Error, Classid not exists!'
+                #messa = 'Error, Classid not exists!'
+                messa = '该班级在所选时间内暂无数据，请换个班级重试。'
             logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'scid[' + str(self.school_id) + ']classid['+ str(self.class_id) +\
                         ']subjectid[' + str(self.subject_id) + ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
         elif not self.class_id or not self.school_id:
