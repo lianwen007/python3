@@ -1,14 +1,15 @@
 from flask import Blueprint, render_template, redirect,request,jsonify
 from app import app, cache
 from .relog import log
-#from .models import Stwdaycount
-import json,time,requests
 from flask_sqlalchemy import SQLAlchemy
+# from .models import Stwdaycount
+import time
+
 db = SQLAlchemy(app)
 getEnStwInfo = Blueprint('getEnStwInfo', __name__)
 
 
-def getTraceId():
+def get_trace_id():
     import uuid
     return str(uuid.uuid1()).replace('-', '')
 
@@ -19,17 +20,17 @@ def keep_percent_point_num(num, point):
 
 
 @getEnStwInfo.route('/getEnStwInfo', methods=['GET'])
-def get_enstw_info():
+def get_english_stw_info():
     schoolid = request.values.get('schoolId')
     classid = request.values.get('classId', '0')
     starttime = request.values.get('startTime', int(time.time()) - 24*60*60*8)
     endedtime = request.values.get('endTime', int(time.time()))
     if not schoolid:
-        traceid=getTraceId()
-        mess = {'code': 400, 'msg': 'Error! Please enter the correct schoolId!', 'traceId': traceid}
-        logInfo = '400' + '[' + traceid + ']type[getEnStwInfo]' + 'scid[Noid]clid[Noid]' \
-                  +'sttime[' + str(starttime) + ']endtime[' + str(endedtime) + ']'
-        log('APIRequest-', logInfo)
+        trace_id=get_trace_id()
+        mess = {'code': 400, 'msg': 'Error! Please enter the correct schoolId!', 'traceId': trace_id}
+        log_info = '400' + '[' + trace_id + ']type[getEnStwInfo]' + 'school[No]class[No]' \
+                  + 'start[' + str(starttime) + ']end[' + str(endedtime) + ']'
+        log('APIRequest-', log_info)
         return jsonify(mess)
     else:
         s = GetEnStwInfo(schoolid, classid, starttime, endedtime,)
@@ -46,6 +47,7 @@ def enstw_cache_clear():
         datas = {'msg': 'Error, Password was wrong!'}
     return jsonify(datas)
 
+
 class GetEnStwInfo(object):
     def __init__(self, schoolid, classid, starttime, endedtime,):
         self.schoolid = schoolid
@@ -56,8 +58,8 @@ class GetEnStwInfo(object):
         self.alldescs = ['userId', 'userName', 'schoolId', 'classId', 'className']
 
     def check_school_id(self):
-        sql = "select distinct schoolid from product_stw_encount where schoolid in (%s) \
-                and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
+        sql = "select distinct school_id from product_stw_encount where school_id in (%s) \
+                and (unix_timestamp(`date_time`)>=%s and unix_timestamp(`date_time`)<=%s)" % (
         self.schoolid, self.starttime, self.endedtime)
         rs = db.session.execute(sql)
         if len([chrs for chrs in rs]) > 0:
@@ -68,12 +70,12 @@ class GetEnStwInfo(object):
         def get_all_user(schoolid, classid, alldescs):
             # 获取学校的所有学生列表
             if classid == '0'or not classid:
-                sqlsel = "select DISTINCT userid,username,schoolid,classid,classname from teacher_student_info  " \
-                         "where classname!='教师' AND schoolid in (%s)" % (schoolid)
+                sql = "select DISTINCT userid,username,schoolid,classid,classname from teacher_student_info  " \
+                         "where classname!='教师' AND schoolid in (%s)" % schoolid
             else:
-                sqlsel = "select DISTINCT userid,username,schoolid,classid,classname from teacher_student_info  " \
-                     "where classname!='教师' AND classid in (%s)" % (classid)
-            data_lists = db.session.execute(sqlsel)
+                sql = "select DISTINCT userid,username,schoolid,classid,classname from teacher_student_info  " \
+                     "where classname!='教师' AND classid in (%s)" % classid
+            data_lists = db.session.execute(sql)
             messes = []
             for datas in data_lists:
                 mess = {}
@@ -83,23 +85,28 @@ class GetEnStwInfo(object):
             return messes
 
         descnames = ['userId', 'userName', 'schoolId', 'classId', 'className', 'gameCount', 'finCount',
-                     'homeFull', 'selfCount', 'selfFull', 'listenFull', 'readFull', 'blankFull', 'listenRate',
-                     'readRate', 'blankRate', 'listenNum', 'readNum', 'blankNum', 'rightRate']
+                     'homeFull', 'selfCount', 'selfFull', 'listenFull', 'readFull', 'blankFull', 'fillBlankFull',
+                     'listenRate', 'readRate', 'blankRate', 'fillBlankRate', 'listenNum', 'readNum',
+                     'blankNum', 'fillBlankNum', 'rightRate']
         if not self.classid or self.classid == '0':
-            sqlsel = "SELECT userid,username,schoolid,classid,classname,CAST(SUM(gamecount)AS SIGNED),CAST(SUM(finishcount)AS SIGNED),\
-            CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listenfull)AS SIGNED),\
-            CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(IF(listennum>0,listenrate,NULL))AS SIGNED),CAST(AVG(IF(readnum>0,readrate,NULL))AS SIGNED),\
-            CAST(AVG(IF(blanknum>0,blankrate,NULL))AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST(AVG(rateavg)AS SIGNED)\
-            FROM product_stw_encount WHERE schoolid=%s AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
+            sql = "SELECT student_id,student_name,school_id,class_id,class_name,CAST(SUM(task_count)AS SIGNED),CAST(SUM(finish_count)AS SIGNED),\
+            CAST(SUM(home_full)AS SIGNED),CAST(SUM(self_count)AS SIGNED),CAST(SUM(self_full)AS SIGNED),CAST(SUM(listen_full)AS SIGNED),\
+            CAST(SUM(read_full)AS SIGNED),CAST(SUM(blank_full)AS SIGNED),CAST(SUM(fill_blank_full)AS SIGNED), \
+            CAST(AVG(IF(listen_num>0,listen_rate,NULL))AS SIGNED),CAST(AVG(IF(read_num>0,read_rate,NULL))AS SIGNED),\
+            CAST(AVG(IF(blank_num>0,blank_rate,NULL))AS SIGNED), CAST(AVG(IF(fill_blank_num>0,fill_blank_rate,NULL))AS SIGNED), \
+            CAST(SUM(listen_num)AS SIGNED),CAST(SUM(read_num)AS SIGNED),CAST(SUM(blank_num)AS SIGNED),CAST(SUM(fill_blank_num)AS SIGNED),CAST(AVG(rate_avg)AS SIGNED)\
+            FROM product_stw_encount WHERE school_id=%s AND unix_timestamp(`date_time`)>=%s AND unix_timestamp(`date_time`)<=%s GROUP BY student_id,student_name,school_id,class_id,class_name" \
                  % (self.schoolid, self.starttime, self.endedtime)
         else:
-            sqlsel = "SELECT userid,username,schoolid,classid,classname,CAST(SUM(gamecount)AS SIGNED),CAST(SUM(finishcount)AS SIGNED),\
-             CAST(SUM(homefull)AS SIGNED),CAST(SUM(selfcount)AS SIGNED),CAST(SUM(selffull)AS SIGNED),CAST(SUM(listenfull)AS SIGNED),\
-            CAST(SUM(readfull)AS SIGNED),CAST(SUM(blankfull)AS SIGNED),CAST(AVG(IF(listennum>0,listenrate,NULL))AS SIGNED),CAST(AVG(IF(readnum>0,readrate,NULL))AS SIGNED),\
-            CAST(AVG(IF(blanknum>0,blankrate,NULL))AS SIGNED),CAST(SUM(listennum)AS SIGNED),CAST(SUM(readnum)AS SIGNED),CAST(SUM(blanknum)AS SIGNED),CAST(AVG(rateavg)AS SIGNED)\
-             FROM product_stw_encount WHERE classid=%s AND unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s GROUP BY userid,username,schoolid,classid,classname" \
+            sql = "SELECT student_id,student_name,school_id,class_id,class_name,CAST(SUM(task_count)AS SIGNED),CAST(SUM(finish_count)AS SIGNED),\
+            CAST(SUM(home_full)AS SIGNED),CAST(SUM(self_count)AS SIGNED),CAST(SUM(self_full)AS SIGNED),CAST(SUM(listen_full)AS SIGNED),\
+            CAST(SUM(read_full)AS SIGNED),CAST(SUM(blank_full)AS SIGNED),CAST(SUM(fill_blank_full)AS SIGNED), \
+            CAST(AVG(IF(listen_num>0,listen_rate,NULL))AS SIGNED),CAST(AVG(IF(read_num>0,read_rate,NULL))AS SIGNED),\
+            CAST(AVG(IF(blank_num>0,blank_rate,NULL))AS SIGNED), CAST(AVG(IF(fill_blank_num>0,fill_blank_rate,NULL))AS SIGNED), \
+            CAST(SUM(listen_num)AS SIGNED),CAST(SUM(read_num)AS SIGNED),CAST(SUM(blank_num)AS SIGNED),CAST(SUM(fill_blank_num)AS SIGNED),CAST(AVG(rate_avg)AS SIGNED)\
+            FROM product_stw_encount WHERE class_id=%s AND unix_timestamp(`date_time`)>=%s AND unix_timestamp(`date_time`)<=%s GROUP BY student_id,student_name,school_id,class_id,class_name" \
                      % (self.classid, self.starttime, self.endedtime)
-        data_list = db.session.execute(sqlsel)
+        data_list = db.session.execute(sql)
         messes = []
         for datas in data_list:
             mess = {}
@@ -108,8 +115,9 @@ class GetEnStwInfo(object):
             messes.append(mess)
         try:
             student_all = get_all_user(self.schoolid, self.classid, self.alldescs)
-        except:
-            student_all = []
+        except Exception as e:
+            log(e)
+            student_all = tuple()
         alldatas = []
         for allmess in student_all:
             for rdataf in messes:
@@ -135,8 +143,8 @@ class GetEnStwInfo(object):
         return alldatas
 
     def main(self):
-        data = { }
-        data['traceId'] = getTraceId()
+        data = dict()
+        data['traceId'] = get_trace_id()
         self.check_school_id()
         if self.checkscid == 'right':
             data['code'] = 200
@@ -144,8 +152,9 @@ class GetEnStwInfo(object):
             data['msg'] = 'successful!'
         else:
             data['code'] = 400
-            data['msg'] = 'Error! These schools are not exist!'
-        logInfo = str(data['code']) + '[' + data['traceId'] + ']type[getEnStwInfo]' + 'scid[' + str(self.schoolid) \
-                  + ']clid[' + str(self.classid) + ']sttime[' + str(self.starttime) + ']endtime[' + str(self.endedtime) + ']'
-        log('APIRequest-', logInfo)
+            # data['msg'] = 'Error! These schools are not exist!'
+            data['msg'] = '该班级在所选时间内暂无数据，请换个班级重试。'
+        log_info = str(data['code']) + '[' + data['traceId'] + ']type[getEnStwInfo]' + 'school[' + str(self.schoolid) \
+                  + ']class[' + str(self.classid) + ']start[' + str(self.starttime) + ']end[' + str(self.endedtime) + ']'
+        log('APIRequest-', log_info)
         return data
