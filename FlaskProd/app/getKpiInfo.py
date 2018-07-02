@@ -88,15 +88,19 @@ class Getkpiinfo(object):
                 reqdatas = requests.get(url, params=getdata, timeout=2).json()
             except:
                 reqdatas = []
-                #cache.delete_memoized('get_teacher_subject', schoolId, subjectId)
+                # cache.delete_memoized('get_teacher_subject', schoolId, subjectId)
             return reqdatas
 
-        descnames = ['tchId', 'tchName', 'classId', 'className', 'stuNum', 'practiceNum', 'taskFixNum', 'taskStuNum', 'taskUploadNum']
-        sqlsel = "SELECT teacherid,teachername,classid,classname,studentnum,CAST(SUM(practicenum)AS SIGNED) practiceNum,CAST(SUM(taskfixnum)AS SIGNED)taskFixNum,\
-            CAST(SUM(taskstunum)AS SIGNED)taskStuNum,CAST(SUM(taskupnum)AS SIGNED)taskUploadNum FROM product_stw_kpicount WHERE schoolid=%s \
-            AND subjectid=%s AND (`datetime`>=FROM_UNIXTIME(%s,'%%Y%%m%%d') AND `datetime`<=FROM_UNIXTIME(%s,'%%Y%%m%%d'))\
-            GROUP BY teacherid,teachername,classid,classname,studentnum" % (self.schoolid, self.subjectid, self.starttime, self.endedtime)
-        data_list = db.session.execute(sqlsel)
+        descnames = ['tchId', 'tchName', 'classId', 'className', 'stuNum', 'practiceNum', 'taskFixNum',
+                     'taskStuNum', 'taskUploadNum']
+        sql_select = "SELECT teacher_id,teacher_name,class_id,class_name,student_num,CAST(SUM(self_prac_times)AS SIGNED) practiceNum,\
+                 CAST(SUM(task_times)AS SIGNED)taskFixNum, CAST(SUM(task_num)AS SIGNED)taskStuNum,\
+                 CAST(SUM(upload_num)AS SIGNED)taskUploadNum FROM king_kpi_count_daily WHERE school_id=%s \
+                 AND subject_id=%s AND (`date_time`>=FROM_UNIXTIME(%s,'%%Y%%m%%d') AND \
+                 `date_time`<=FROM_UNIXTIME(%s,'%%Y%%m%%d'))\
+                 GROUP BY teacher_id,teacher_name,class_id,class_name,student_num" \
+                 % (self.schoolid, self.subjectid, self.starttime, self.endedtime)
+        data_list = db.session.execute(sql_select)
         messes = []
         reqteachers = get_teacher_subject(self.schoolid, self.subjectid)
         for datas in data_list:
