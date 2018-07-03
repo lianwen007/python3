@@ -1,15 +1,15 @@
 from flask import Blueprint, render_template, redirect, request, jsonify
 from app import app, cache
 from .relog import log
-#from .models import Stwdaycount
-import json, time, requests
+import time
+import requests
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
 
 getStwInfo = Blueprint('getStwInfo', __name__)
 
 
-def getTraceId():
+def get_trace_id():
     import uuid
     return str(uuid.uuid1()).replace('-', '')
 
@@ -38,7 +38,7 @@ def get_stw_info():
             s = GetStwInfo(school_id=schoolid, start_time=starttime, end_time=endedtime,
                            book_id=bookid, class_id=classid)
         return jsonify(s.main())
-            # json.dumps(s.main(), ensure_ascii=False)
+        # json.dumps(s.main(), ensure_ascii=False)
     except AttributeError:
         data = {"code": "405", "msg": "Values error, Check your 'Content-Type' first!"}
         return jsonify(data)
@@ -119,8 +119,8 @@ class StwInfoBase(object):
 
     def check_school_id(self):
         # 检查学校ID
-        sql = "SELECT DISTINCT schoolid FROM product_stw_daycount WHERE schoolid in (%s) \
-                        AND (unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s)" % (
+        sql = "SELECT DISTINCT school_id FROM king_common_count_daily WHERE school_id in (%s) \
+                        AND (unix_timestamp(`date_time`)>=%s AND unix_timestamp(`date_time`)<=%s)" % (
             self.school_id, self.start_time, self.end_time)
         rs = db.session.execute(sql)
         if len([i for i in rs]) > 0:
@@ -129,8 +129,8 @@ class StwInfoBase(object):
 
     def check_book_id(self):
         # 检查书本ID是否存在
-        sql = "SELECT DISTINCT schoolid FROM product_stw_daycount WHERE schoolid in (%s) AND bookid IN (%s) \
-                AND (unix_timestamp(`datetime`)>=%s AND unix_timestamp(`datetime`)<=%s)" % (
+        sql = "SELECT DISTINCT school_id FROM king_common_count_daily WHERE school_id in (%s) AND book_id IN (%s) \
+                AND (unix_timestamp(`date_time`)>=%s AND unix_timestamp(`date_time`)<=%s)" % (
             self.school_id, self.book_id, self.start_time, self.end_time)
         rs = db.session.execute(sql)
         if len([i for i in rs]) > 0:
@@ -281,30 +281,30 @@ class Getbookid(StwInfoBase):
 
     def main(self):
         data_book = self.find_all_book_id()
-        traceId = getTraceId()
+        trace_id = get_trace_id()
         data = dict()
-        data['traceId'] = traceId
+        data['trace_id'] = trace_id
         data['code'] = 200
         data['data'] = data_book
         data['msg'] = 'Successful!'
-        logInfo = str(data['code']) + '[' + traceId + ']type[getBookid]' + 'scid[All]' + 'subjectId[' + \
+        log_info = str(data['code']) + '[' + trace_id + ']type[getBookid]' + 'school[All]' + 'subjectId[' + \
                   str(self.subject_book) + ']'
-        log('APIRequest-', logInfo)
-        # log('logInfo:Getbookid - ', data['code'])
+        log('APIRequest-', log_info)
+        # log('log_info:Getbookid - ', data['code'])
         return data
 
     def main_subject(self):
         data_book = self.find_book_id_subject()
-        traceId = getTraceId()
+        trace_id = get_trace_id()
         data = dict()
-        data['traceId'] = traceId
+        data['trace_id'] = trace_id
         data['code'] = 200
         data['data'] = data_book
         data['msg'] = 'Successful!'
-        logInfo = str(data['code']) + '[' + traceId + ']type[getBookid]' + 'scid[All]' + 'subjectId[' + \
+        log_info = str(data['code']) + '[' + trace_id + ']type[getBookid]' + 'school[All]' + 'subjectId[' + \
                   str(self.subject_book) + ']'
-        log('APIRequest-', logInfo)
-        # log('logInfo:Getbookid - ', data['code'])
+        log('APIRequest-', log_info)
+        # log('log_info:Getbookid - ', data['code'])
         return data
 
 
@@ -312,38 +312,38 @@ class GetStwInfo(StwInfoBase):
     # 获取数据的主类
     def get_king_info(self):
         # 数据拉取的主函数
-        desc_names = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'countscore', 'numhomework',
-                      'numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime', 'topicold']
+        desc_names = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'countscore', 'integral',
+                      'numhomework','numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime', 'topicold']
         subtype_result = self.get_sub_type()
         if subtype_result == 2 or subtype_result == 5:
             if not self.class_id or self.class_id == 0:
-                sql_select = "SELECT userid,username,schoolid,schoolname,classname,countscore,CAST(SUM(numhomework)AS SIGNED),\
-                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)/10 AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(rightlv)*10/SUM(topicnum)AS SIGNED),\
-                        CAST(SUM(counttime)*10/(SUM(topicnum))AS SIGNED),CAST(SUM(numhomework)+SUM(numselfwork)AS SIGNED) \
-                        FROM product_stw_daycount WHERE schoolid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid IN (%s) GROUP BY userid,username,schoolid,schoolname,classname,countscore" \
-                         % (self.school_id, self.start_time, self.end_time, self.book_id)
+                sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
+                        CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)/10 AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_rate)/SUM(topic_num)AS SIGNED),\
+                        CAST(SUM(time_cost)/(SUM(topic_num))AS SIGNED),CAST(SUM(homework_num)+SUM(self_work_num)AS SIGNED) \
+                        FROM king_common_count_daily WHERE school_id IN (%s)AND (unix_timestamp(`date_time`) >= %s AND unix_timestamp(`date_time`) <= %s)\
+                        AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
+                            % (self.school_id, self.start_time, self.end_time, self.book_id)
             else:
-                sql_select = "SELECT userid,username,schoolid,schoolname,classname,countscore,CAST(SUM(numhomework)AS SIGNED),\
-                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)/10 AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(rightlv)*10/SUM(topicnum)AS SIGNED),\
-                        CAST(SUM(counttime)*10/(SUM(topicnum))AS SIGNED),CAST(SUM(numhomework)+SUM(numselfwork)AS SIGNED)\
-                        FROM product_stw_daycount WHERE classid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid IN (%s) GROUP BY userid,username,schoolid,schoolname,classname,countscore" \
+                sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
+                        CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)/10 AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_rate)/SUM(topic_num)AS SIGNED),\
+                        CAST(SUM(time_cost)/(SUM(topic_num))AS SIGNED),CAST(SUM(homework_num)+SUM(self_work_num)AS SIGNED)\
+                        FROM king_common_count_daily WHERE class_id IN (%s)AND (unix_timestamp(`date_time`) >= %s AND unix_timestamp(`date_time`) <= %s)\
+                        AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
                          % (self.class_id, self.start_time, self.end_time, self.book_id)
         else:
             if not self.class_id or self.class_id == 0:
-                sql_select = "SELECT userid,username,schoolid,schoolname,classname,countscore,CAST(SUM(numhomework)AS SIGNED),\
-                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(countright)*100/SUM(topicnum)AS SIGNED),\
-                        CAST(SUM(counttime)/(SUM(numhomework)+SUM(numselfwork))AS SIGNED),CAST((SUM(numhomework)+SUM(numselfwork))*10 AS SIGNED) \
-                        FROM product_stw_daycount WHERE schoolid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid IN (%s) GROUP BY userid,username,schoolid,schoolname,classname,countscore" \
+                sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
+                        CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_num)*100/SUM(topic_num)AS SIGNED),\
+                        CAST(SUM(time_cost)/(SUM(homework_num)+SUM(self_work_num))AS SIGNED),CAST((SUM(homework_num)+SUM(self_work_num))*10 AS SIGNED) \
+                        FROM king_common_count_daily WHERE school_id IN (%s)AND (unix_timestamp(`date_time`) >= %s AND unix_timestamp(`date_time`) <= %s)\
+                        AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
                          % (self.school_id, self.start_time, self.end_time, self.book_id)
             else:
-                sql_select = "SELECT userid,username,schoolid,schoolname,classname,countscore,CAST(SUM(numhomework)AS SIGNED),\
-                        CAST(SUM(numselfwork)AS SIGNED),CAST(SUM(topicnum)AS SIGNED),CAST(SUM(countright)AS SIGNED),CAST(SUM(countright)*100/SUM(topicnum)AS SIGNED),\
-                        CAST(SUM(counttime)/(SUM(numhomework)+SUM(numselfwork))AS SIGNED),CAST((SUM(numhomework)+SUM(numselfwork))*10 AS SIGNED) \
-                        FROM product_stw_daycount WHERE classid IN (%s)AND (unix_timestamp(`datetime`) >= %s AND unix_timestamp(`datetime`) <= %s)\
-                        AND bookid IN (%s) GROUP BY userid,username,schoolid,schoolname,classname,countscore" \
+                sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
+                        CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_num)*100/SUM(topic_num)AS SIGNED),\
+                        CAST(SUM(time_cost)/(SUM(homework_num)+SUM(self_work_num))AS SIGNED),CAST((SUM(homework_num)+SUM(self_work_num))*10 AS SIGNED) \
+                        FROM king_common_count_daily WHERE class_id IN (%s)AND (unix_timestamp(`date_time`) >= %s AND unix_timestamp(`date_time`) <= %s)\
+                        AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
                          % (self.class_id, self.start_time, self.end_time, self.book_id)
         data_list = db.session.execute(sql_select)
         messes = []
@@ -352,27 +352,27 @@ class GetStwInfo(StwInfoBase):
             for x in range(len(data)):
                 mess[desc_names[x]] = data[x]
             messes.append(mess)
-        sta1 = time.time()
+        # sta1 = time.time()
         try:
             live_hp_data = self.get_live_hp()
         except Exception as e:
             live_hp_data = []
-            log(e)
-        end1 = time.time()
-        sta3 = time.time()
+            log('kingInfoError:', e)
+        # end1 = time.time()
+        # sta3 = time.time()
         all_user_data = self.get_all_user()
-        end3 = time.time()
-        log('live_hp-', end1-sta1, 'live_all_user-', end3 - sta3,)
+        # end3 = time.time()
+        # log('live_hp-', end1-sta1, 'live_all_user-', end3 - sta3,)
         values = []
         for user_data in all_user_data:
             user_data["hp"] = 0
             user_data["credit"] = 0
-            user_data["integral"] = 0
             for desc_name in desc_names[5:]:
                 user_data[desc_name] = 0
             for m in messes:
                 if str(m["userid"]) == str(user_data["userid"]):
                     user_data["countscore"] = m["countscore"]
+                    user_data["integral"] = m["integral"]
                     user_data["numhomework"] = m["numhomework"]
                     user_data["numselfwork"] = m["numselfwork"]
                     user_data["topicnum"] = m["topicnum"]
@@ -393,15 +393,15 @@ class GetStwInfo(StwInfoBase):
         data_list = db.session.execute(sql)
         for data in data_list:
             mess = data[0]
-        return mess
+            return mess
 
     def main(self):
         #  判定有学校ID和对应的书本ID后，再执行数据拉取，并写入日志
         check_school_result = self.check_school_id()
         check_book_result = self.check_book_id()
-        traceId = getTraceId()
+        trace_id = get_trace_id()
         data = dict()
-        data['traceId'] = traceId
+        data['trace_id'] = trace_id
         if check_school_result and check_book_result:
             data['code'] = 200
             data['data'] = GetStwInfo.get_king_info(self)
@@ -409,10 +409,10 @@ class GetStwInfo(StwInfoBase):
         else:
             data['code'] = 400
             data['msg'] = 'These schools or books are not exist!'
-        logInfo = str(data['code']) + '[' + traceId + ']type[getStwinfo]' + 'scid[' + self.school_id + ']' +\
+        log_info = str(data['code']) + '[' + trace_id + ']type[getStwinfo]' + 'school[' + self.school_id + ']' +\
                     'sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']' + 'bkid[' +\
                     str(self.book_id) + ']' + 'clid[' + str(self.class_id) + ']'
-        log('APIRequest-', logInfo)
+        log('APIRequest-', log_info)
         return data
 
 
@@ -459,7 +459,7 @@ class GetStwStudent(StwInfoBase):
 
     def main(self):
         check_class = self.check_class_id()
-        traceId = getTraceId()
+        trace_id = get_trace_id()
         if self.class_id and self.school_id and self.subject_id:
             if check_class:
                 datav = self.get_stw_student()
@@ -468,29 +468,35 @@ class GetStwStudent(StwInfoBase):
             else:
                 datav = 'No data!'
                 codenum = 400
-                #messa = 'Error, Classid not exists!'
+                # messa = 'Error, Classid not exists!'
                 messa = '该班级在所选时间内暂无数据，请换个班级重试。'
-            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]' + 'scid[' + str(self.school_id) + ']classid['+ str(self.class_id) +\
-                        ']subjectid[' + str(self.subject_id) + ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
+            log_info = str(codenum) + '[' + trace_id + ']type[getStudent]' + 'school[' + str(self.school_id) + ']class['+ str(self.class_id) +\
+                        ']subjectid[' + str(self.subject_id) + ']start[' + str(self.start_time) + ']' + 'end[' + str(self.end_time) + ']'
         elif not self.class_id or not self.school_id:
             datav = 'No data!'
             codenum = 400
             messa = 'Classid or schoolid not exists!'
-            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]subname[' + str(self.subject_name) + \
-                      ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
+            log_info = str(codenum) + '[' + trace_id + ']type[getStudent]subname[' + str(self.subject_name) + \
+                      ']start[' + str(self.start_time) + ']' + 'end[' + str(self.end_time) + ']'
         elif not self.subject_id:
             datav = 'No data!'
             codenum = 400
             messa = 'SubjectName not exists!'
-            logInfo = str(codenum) + '[' + traceId + ']type[getStudent]subname[' + str(self.subject_name) + \
-                      ']sttime[' + str(self.start_time) + ']' + 'endtime[' + str(self.end_time) + ']'
+            log_info = str(codenum) + '[' + trace_id + ']type[getStudent]subname[' + str(self.subject_name) + \
+                      ']start[' + str(self.start_time) + ']' + 'end[' + str(self.end_time) + ']'
+        else:
+            datav = 'No data!'
+            codenum = 400
+            messa = 'Unknown Error, Please try again latter!'
+            log_info = str(codenum) + '[' + trace_id + ']type[getStudent]subname[' + str(self.subject_name) + \
+                       ']start[' + str(self.start_time) + ']' + 'end[' + str(self.end_time) + ']'
         data = dict()
-        data['traceId'] = traceId
+        data['trace_id'] = trace_id
         data['code'] = codenum
         data['data'] = datav
         data['msg'] = messa
-        log('APIRequest-', logInfo)
-        # log('logInfo:Getbookid - ', data['code'])
+        log('APIRequest-', log_info)
+        # log('log_info:Getbookid - ', data['code'])
         return data
 
 
