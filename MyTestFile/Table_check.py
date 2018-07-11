@@ -134,20 +134,50 @@ def deal_main(max_works=10):
         for base_value in base_values:
             check_date = executor.submit(check_table_date,base_value[1],
                                          base_value[2],base_value[3]).result()
-            if str(check_date) == str(today_date):
+            want_date = str(int(today_date) + int(base_value[7]))
+            if str(check_date) == want_date:
                 html_date = '<td bgcolor="#009933" >%s</td>' %check_date
             else:
                 html_date = '<td bgcolor="red">%s</td>' %check_date
             html_td = '<td>%s</td><td>%s</td><td>%s</td><td>%s</td>\
-                        <td>%s</td>%s'\
+                        <td>%s</td>%s<td>%s</td>'\
                         %(base_value[4],base_value[1],base_value[2],base_value[5],
-                          base_value[6],html_date)
+                          base_value[6],html_date,want_date)
             html_td_v = '<tr> %s </tr>' %html_td
             html_td_end += html_td_v
     html_th_end = '<th>产品/报表</th><th>数据库</th><th>数据表</th>\
-                    <th>频率</th><th>优先级</th><th>数据日期</th>'
+                    <th>频率</th><th>优先级</th><th>数据日期</th><th>期望日期</th>'
     html_end = fill_html_text(html_td=html_td_end,html_th=html_th_end)
     user_email = get_user_email()
     subject_title = '大数据定时巡检%s' %today_date
     send_mail(to_name=user_email,subject=subject_title,html_text=html_end)
+    print(html_end)
     return 1
+#sched.start()
+
+
+#@sched.scheduled_job(trigger)
+#def thread_deal(max_works=10):
+#    base_values, db_tables = get_base_info()
+#    start_time = time.time()
+#    with ThreadPoolExecutor(max_workers=max_works) as executor:
+#        for base_value in base_values:
+#            html_td_v = ''
+#            for v in vase_value:
+#                html_td = '<td>%s</td>'%(v)
+#                html_td_v += html_td
+#            
+#            
+#        future_task = executor.submit(self.mongo_to_txt, ex_path_name, skip_num)
+#        if future_task.running():
+#            set_log('%s is running' % str(future_task))
+#    end_time = time.time()
+#    return 1
+    
+    
+    
+#if __name__ == '__main__':
+#    name_to = ['443129953@qq.com','lwc@quuedu.com']
+#    subject_to = 'test002'
+#    html_txt = fill_html_text()
+#    send_mail(_default_server, name_to, subject_to, html_txt)
