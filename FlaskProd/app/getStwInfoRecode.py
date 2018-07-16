@@ -113,15 +113,17 @@ class StwInfoBase(object):
         self.subject_book = kwargs.get('subject_book', '')
         self.subject_name = kwargs.get('subject_name', '')
         self.start_time = kwargs.get('start_time', int(time.time()) - 24*60*60*8)
+        self.start_date = time.strftime("%Y%m%d", time.localtime(self.start_time))
         self.end_time = kwargs.get('end_time', int(time.time()))
+        self.end_date = time.strftime("%Y%m%d", time.localtime(self.end_time))
         subpart = {'语文': 1, '数学': 2, '英语': 3, '科学': 4, '历史': 5, '道德与法治': 6, '物理': 7}
         self.subject_id = subpart.get(self.subject_name)
 
     def check_school_id(self):
         # 检查学校ID
         sql = "SELECT DISTINCT school_id FROM king_common_count_daily WHERE school_id in (%s) \
-                        AND (unix_timestamp(`date_time`)>=%s AND unix_timestamp(`date_time`)<=%s)" % (
-            self.school_id, self.start_time, self.end_time)
+                        AND (date_time >= '%s' AND date_time <= '%s')" % (
+            self.school_id, self.start_date, self.end_date)
         rs = db.session.execute(sql)
         if len([i for i in rs]) > 0:
             return True
@@ -130,8 +132,8 @@ class StwInfoBase(object):
     def check_book_id(self):
         # 检查书本ID是否存在
         sql = "SELECT DISTINCT school_id FROM king_common_count_daily WHERE school_id in (%s) AND book_id IN (%s) \
-                AND (unix_timestamp(`date_time`)>=%s AND unix_timestamp(`date_time`)<=%s)" % (
-            self.school_id, self.book_id, self.start_time, self.end_time)
+                AND (date_time >= '%s' AND date_time <= '%s')" % (
+            self.school_id, self.book_id, self.start_date, self.end_date)
         rs = db.session.execute(sql)
         if len([i for i in rs]) > 0:
             return True
@@ -241,7 +243,7 @@ class StwInfoBase(object):
         return get_live_student_integral(self.school_id, self.class_id, self.book_id, self.start_time, self.end_time)
 
     def get_sub_type(self):
-        sql = "SELECT DISTINCT subtype FROM product_stw_subject WHERE bookid IN (%s)" % self.book_id
+        sql = "SELECT DISTINCT book_type FROM king_book_library WHERE book_id IN (%s)" % self.book_id
         data_list = db.session.execute(sql)
         for x in data_list:
             data = x[0]
@@ -254,7 +256,7 @@ class Getbookid(StwInfoBase):
     @cache.cached(timeout=3600*12, key_prefix='book_id')
     def find_all_book_id(self):
         # 获取所有书本ID对应书名和书本规则列表
-        sql = "select distinct bookname,bookid,subtype from product_stw_subject"
+        sql = "select distinct book_name,book_id,book_type from king_book_library"
         desc_names = ['bookname', 'bookid', 'subtype']
         data_list = db.session.execute(sql)
         messes = []
@@ -267,7 +269,7 @@ class Getbookid(StwInfoBase):
 
     def find_book_id_subject(self):
         # 根据SUBJECT 获取书本ID
-        sql = "select distinct bookname,bookid,subtype from product_stw_subject WHERE subjectid='%s'" \
+        sql = "select distinct book_name,book_id,book_type from king_book_library WHERE subject_id='%s'" \
               % self.subject_book
         desc_names = ['bookname', 'bookid', 'subtype']
         data_list = db.session.execute(sql)
@@ -320,31 +322,31 @@ class GetStwInfo(StwInfoBase):
                 sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
                         CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)/10 AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_rate)/SUM(topic_num)AS SIGNED),\
                         CAST(SUM(time_cost)/(SUM(topic_num))AS SIGNED),CAST(SUM(homework_num)+SUM(self_work_num)AS SIGNED) \
-                        FROM king_common_count_daily WHERE school_id IN (%s)AND (unix_timestamp(`date_time`) >= %s AND unix_timestamp(`date_time`) <= %s)\
+                        FROM king_common_count_daily WHERE school_id IN (%s) AND (date_time >= '%s' AND date_time <= '%s')\
                         AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
-                            % (self.school_id, self.start_time, self.end_time, self.book_id)
+                            % (self.school_id, self.start_date, self.end_date, self.book_id)
             else:
                 sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
                         CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)/10 AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_rate)/SUM(topic_num)AS SIGNED),\
                         CAST(SUM(time_cost)/(SUM(topic_num))AS SIGNED),CAST(SUM(homework_num)+SUM(self_work_num)AS SIGNED)\
-                        FROM king_common_count_daily WHERE class_id IN (%s)AND (unix_timestamp(`date_time`) >= %s AND unix_timestamp(`date_time`) <= %s)\
+                        FROM king_common_count_daily WHERE class_id IN (%s)AND (date_time >= '%s' AND date_time <= '%s')\
                         AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
-                         % (self.class_id, self.start_time, self.end_time, self.book_id)
+                         % (self.class_id, self.start_date, self.end_date, self.book_id)
         else:
             if not self.class_id or self.class_id == 0:
                 sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
                         CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_num)*100/SUM(topic_num)AS SIGNED),\
                         CAST(SUM(time_cost)/(SUM(homework_num)+SUM(self_work_num))AS SIGNED),CAST((SUM(homework_num)+SUM(self_work_num))*10 AS SIGNED) \
-                        FROM king_common_count_daily WHERE school_id IN (%s)AND (unix_timestamp(`date_time`) >= %s AND unix_timestamp(`date_time`) <= %s)\
+                        FROM king_common_count_daily WHERE school_id IN (%s)AND (date_time >= '%s' AND date_time <= '%s')\
                         AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
-                         % (self.school_id, self.start_time, self.end_time, self.book_id)
+                         % (self.school_id, self.start_date, self.end_date, self.book_id)
             else:
                 sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
                         CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_num)*100/SUM(topic_num)AS SIGNED),\
                         CAST(SUM(time_cost)/(SUM(homework_num)+SUM(self_work_num))AS SIGNED),CAST((SUM(homework_num)+SUM(self_work_num))*10 AS SIGNED) \
-                        FROM king_common_count_daily WHERE class_id IN (%s)AND (unix_timestamp(`date_time`) >= %s AND unix_timestamp(`date_time`) <= %s)\
+                        FROM king_common_count_daily WHERE class_id IN (%s)AND (date_time >= '%s' AND date_time <= '%s')\
                         AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
-                         % (self.class_id, self.start_time, self.end_time, self.book_id)
+                         % (self.class_id, self.start_date, self.end_date, self.book_id)
         data_list = db.session.execute(sql_select)
         messes = []
         for data in data_list:
@@ -389,7 +391,7 @@ class GetStwInfo(StwInfoBase):
 
     def find_book_name_byid(self):
         # 获取书本ID对应书名
-        sql = "select distinct bookname from product_stw_subject WHERE bookid ='%s'" % self.book_id
+        sql = "select distinct book_name from king_book_library WHERE book_id ='%s'" % self.book_id
         data_list = db.session.execute(sql)
         for data in data_list:
             mess = data[0]
@@ -429,6 +431,8 @@ class GetStwStudent(StwInfoBase):
             mess = {}
             for x in range(len(data)):
                 mess[descnames[x]] = data[x]
+            if not mess['rightnum']:
+                mess['rightnum'] = 0
             mess['rightrate'] = int((mess['rightnum']/mess['topicnum'])*10000)/100
             messes.append(mess)
         all_messes = self.get_all_user()
@@ -446,9 +450,9 @@ class GetStwStudent(StwInfoBase):
     def check_class_id(self):
         # 检查班级ID是否存在
         if self.class_id:
-            sql = "select distinct classid from product_stw_daycount where classid in (%s) \
-                    and (unix_timestamp(`datetime`)>=%s and unix_timestamp(`datetime`)<=%s)" % (
-                    self.class_id, self.start_time, self.end_time)
+            sql = "select distinct class_id from king_common_count_daily where class_id in (%s) \
+                    and (date_time >= '%s' AND date_time <= '%s')" % (
+                    self.class_id, self.start_date, self.end_date)
             try:
                 rs = db.session.execute(sql)
             except:
