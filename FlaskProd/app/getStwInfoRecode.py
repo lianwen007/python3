@@ -51,7 +51,8 @@ def get_stw_book_subject():
         s = Getbookid(subject_book=subject_id)
         return jsonify(s.main_subject())
     else:
-        data = [{'subjectId': 2, 'subjectName': '数学', 'subType': 1},
+        data = [{'subjectId': 1, 'subjectName': '语文', 'subType': 5},
+                {'subjectId': 2, 'subjectName': '数学', 'subType': 1},
                 {'subjectId': 3, 'subjectName': '英语', 'subType': 2},
                 {'subjectId': 4, 'subjectName': '科学', 'subType': 1},
                 {'subjectId': 5, 'subjectName': '历史与社会', 'subType': 3},
