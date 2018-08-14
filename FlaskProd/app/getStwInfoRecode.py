@@ -3,6 +3,7 @@ from app import app, cache
 from .relog import log
 import time
 import requests
+import pandas as pd
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
 
@@ -316,9 +317,9 @@ class GetStwInfo(StwInfoBase):
     def get_king_info(self):
         # 数据拉取的主函数
         desc_names = ['userid', 'username', 'schoolid', 'schoolname', 'classname', 'countscore', 'integral',
-                      'numhomework','numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime', 'topicold']
+                      'numhomework', 'numselfwork', 'topicnum', 'countright', 'rightlv', 'counttime', 'topicold']
         subtype_result = self.get_sub_type()
-        if subtype_result == 2 or subtype_result == 5:
+        if int(subtype_result) == 2 or int(subtype_result) == 5:
             if not self.class_id or self.class_id == 0:
                 sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
                         CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)/10 AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_rate)/SUM(topic_num)AS SIGNED),\
@@ -349,45 +350,71 @@ class GetStwInfo(StwInfoBase):
                         AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
                          % (self.class_id, self.start_date, self.end_date, self.book_id)
         data_list = db.session.execute(sql_select)
-        messes = []
-        for data in data_list:
-            mess = {}
-            for x in range(len(data)):
-                mess[desc_names[x]] = data[x]
-            messes.append(mess)
-        # sta1 = time.time()
+        results = pd.DataFrame(columns=desc_names, data=list(data_list))
+        results['userid'] = results['userid'].astype(int)
+        del (results['username'], results['schoolid'], results['schoolname'], results['classname'])
         try:
-            live_hp_data = self.get_live_hp()
+            all_user = self.get_all_user()
         except Exception as e:
-            live_hp_data = []
+            all_user = list()
             log('kingInfoError:', e)
-        # end1 = time.time()
-        # sta3 = time.time()
-        all_user_data = self.get_all_user()
-        # end3 = time.time()
-        # log('live_hp-', end1-sta1, 'live_all_user-', end3 - sta3,)
-        values = []
-        for user_data in all_user_data:
-            user_data["hp"] = 0
-            user_data["credit"] = 0
-            for desc_name in desc_names[5:]:
-                user_data[desc_name] = 0
-            for m in messes:
-                if str(m["userid"]) == str(user_data["userid"]):
-                    user_data["countscore"] = m["countscore"]
-                    user_data["integral"] = m["integral"]
-                    user_data["numhomework"] = m["numhomework"]
-                    user_data["numselfwork"] = m["numselfwork"]
-                    user_data["topicnum"] = m["topicnum"]
-                    user_data["countright"] = m["countright"]
-                    user_data["rightlv"] = m["rightlv"]
-                    user_data["counttime"] = m["counttime"]
-                    user_data["topicold"] = m["topicold"]
-            for hp_data in live_hp_data:
-                if str(hp_data['studentId']) == str(user_data["userid"]):
-                    user_data["hp"] = hp_data["hp"]
-                    user_data["credit"] = hp_data["credit"]
-            values.append(user_data)
+        user_data = pd.DataFrame(all_user)
+        user_data['userid'] = user_data['userid'].astype(int)
+        try:
+            live_hp = []#self.get_live_hp()
+            hp_data = pd.DataFrame(live_hp)
+            hp_data['studentId'] = hp_data['studentId'].astype(int)
+            del (hp_data['schoolId'], hp_data['classId'], hp_data['grade'])
+        except Exception as e:
+            hp_data = list()
+            log('kingInfoError:', e)
+        if hp_data:
+            user_hp_data = pd.merge(user_data, hp_data, how='left', left_on='userid', right_on='studentId')
+        else:
+            user_data['hp'] = user_data['credit'] = 0
+            user_hp_data = user_data
+        values = pd.merge(user_hp_data, results, how='left', on='userid')
+        values = values.fillna(value=0)
+        values = values.to_dict(orient='records')
+        # messes = []
+        # for data in data_list:
+        #     mess = {}
+        #     for x in range(len(data)):
+        #         mess[desc_names[x]] = data[x]
+        #     messes.append(mess)
+        # # sta1 = time.time()
+        # try:
+        #     live_hp_data = self.get_live_hp()
+        # except Exception as e:
+        #     live_hp_data = []
+        #     log('kingInfoError:', e)
+        # # end1 = time.time()
+        # # sta3 = time.time()
+        # all_user_data = self.get_all_user()
+        # # end3 = time.time()
+        # # log('live_hp-', end1-sta1, 'live_all_user-', end3 - sta3,)
+        # values = []
+        # for user_data in all_user_data:
+        #     user_data["hp"] = 0
+        #     user_data["credit"] = 0
+        #     for desc_name in desc_names[5:]:
+        #         user_data[desc_name] = 0
+        #     for m in messes:
+        #         if str(m["userid"]) == str(user_data["userid"]):
+        #             user_data["countscore"] = m["countscore"]
+        #             user_data["integral"] = m["integral"]
+        #             user_data["numhomework"] = m["numhomework"]
+        #             user_data["numselfwork"] = m["numselfwork"]
+        #             user_data["topicnum"] = m["topicnum"]
+        #             user_data["countright"] = m["countright"]
+        #             user_data["rightlv"] = m["rightlv"]
+        #             user_data["counttime"] = m["counttime"]
+        #             user_data["topicold"] = m["topicold"]
+        #     for hp_data in live_hp_data:
+        #         if str(hp_data['studentId']) == str(user_data["userid"]):
+        #             user_data["hp"] = hp_data["hp"]
+        #             user_data["credit"] = hp_data["credit"]
+        #     values.append(user_data)
         return values
 
     def find_book_name_byid(self):
