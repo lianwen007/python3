@@ -20,7 +20,7 @@ def get_stw_info():
     try:
         if request.method == 'POST':
             # userid = request.args.get('userid') # 使用request.args.get方式获取拼接的入参数据
-            schoolid = request.json.get('schoolid')  # 获取带json串请求的schoolid参数传入的值
+            schoolid = request.json.get('schoolid', '')  # 获取带json串请求的schoolid参数传入的值
             starttime = request.json.get('starttime', int(time.time()) - 24*60*60*8)
             endedtime = request.json.get('endedtime', int(time.time()))
             bookid = request.json.get('bookid', '')
@@ -123,6 +123,7 @@ class StwInfoBase(object):
 
     def check_school_id(self):
         # 检查学校ID
+
         sql = "SELECT DISTINCT school_id FROM king_common_count_daily WHERE school_id in (%s) \
                         AND (date_time >= '%s' AND date_time <= '%s')" % (
             self.school_id, self.start_date, self.end_date)
@@ -207,11 +208,11 @@ class StwInfoBase(object):
             if not class_id or class_id == 0:
                 sql = "SELECT tb1.student_id,CAST(SUM(tb1.total_integral)AS SIGNED) FROM (SELECT "\
                       "DISTINCT student_id,book_id,total_integral FROM king_common_count_daily "\
-                      "WHERE book_id IN (%s)AND school_id IN (%s)) GROUP BY tb1.student_id" % (book_id, school_id)
+                      "WHERE book_id IN (%s)AND school_id IN (%s) GROUP BY student_id" % (book_id, school_id)
             else:
                 sql = "SELECT tb1.student_id,CAST(SUM(tb1.total_integral)AS SIGNED) FROM (SELECT "\
                       "DISTINCT student_id,book_id,total_integral FROM king_common_count_daily "\
-                      "WHERE book_id IN (%s)AND class_id IN (%s)) tb1 GROUP BY tb1.student_id" % (book_id, class_id)
+                      "WHERE book_id IN (%s)AND class_id IN (%s) ) tb1 GROUP BY tb1.student_id" % (book_id, class_id)
             data_lists = db.session.execute(sql)
             messes = pd.DataFrame(columns=names, data=list(data_lists))
             # messes = []
@@ -462,8 +463,16 @@ class GetStwInfo(StwInfoBase):
 
     def main(self):
         #  判定有学校ID和对应的书本ID后，再执行数据拉取，并写入日志
-        check_school_result = self.check_school_id()
-        check_book_result = self.check_book_id()
+        if self.school_id and self.school_id != 'None':
+            check_school_result = self.check_school_id()
+            if self.book_id and self.book_id != 'None':
+                check_book_result = self.check_book_id()
+            else:
+                check_book_result = False
+        else:
+            check_school_result = False
+            check_book_result = False
+
         trace_id = get_trace_id()
         data = dict()
         data['trace_id'] = trace_id
