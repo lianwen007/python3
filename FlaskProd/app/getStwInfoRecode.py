@@ -169,6 +169,7 @@ class StwInfoBase(object):
             # 获取学生的实时的体力和诚信分，访问 Mongo 库
             import pymongo
             mongo_url = "172.16.10.28:50000"
+            # mongo_url = "192.168.5.52:50000"  # 测试库
             client = pymongo.MongoClient(mongo_url)
             mongo_db = client.xh_king
             projection_fields = {'_id': False, 'studentId': True, 'hp': True, 'credit': True,
@@ -200,9 +201,30 @@ class StwInfoBase(object):
         return get_live_student_hp(self.school_id, self.class_id)
 
     def get_live_integral(self):
-        @cache.memoize(timeout=3600)
+        @cache.memoize(timeout=3600 * 12)  # 设置缓存12小时
+        def get_user_integral(school_id, class_id, book_id):
+            names = ['userid', 'countscore']
+            if not class_id or class_id == 0:
+                sql = "SELECT tb1.student_id,CAST(SUM(tb1.total_integral)AS SIGNED) FROM (SELECT "\
+                      "DISTINCT student_id,book_id,total_integral FROM king_common_count_daily "\
+                      "WHERE book_id IN (%s)AND school_id IN (%s)) GROUP BY tb1.student_id" % (book_id, school_id)
+            else:
+                sql = "SELECT tb1.student_id,CAST(SUM(tb1.total_integral)AS SIGNED) FROM (SELECT "\
+                      "DISTINCT student_id,book_id,total_integral FROM king_common_count_daily "\
+                      "WHERE book_id IN (%s)AND class_id IN (%s)) tb1 GROUP BY tb1.student_id" % (book_id, class_id)
+            data_lists = db.session.execute(sql)
+            messes = pd.DataFrame(columns=names, data=list(data_lists))
+            # messes = []
+            # for data in data_lists:
+            #     mess = {}
+            #     for x in range(len(data)):
+            #         mess[names[x]] = data[x]
+            #     messes.append(mess)
+            return messes
+
         def get_live_student_integral(school_id='', class_id='', book_id='', start_time=0, end_time=0):
             # 获取学生每局的得分求和，返回学生ID和对应的分数
+            # ##20180711 已停用
             import pymongo
             mongo_url = "172.16.10.28:50000"
             client = pymongo.MongoClient(mongo_url)
@@ -242,7 +264,7 @@ class StwInfoBase(object):
                     fin_data['studentId'] = user_id
                     user_data_fin.append(fin_data)
             return user_data_fin
-        return get_live_student_integral(self.school_id, self.class_id, self.book_id, self.start_time, self.end_time)
+        return get_user_integral(self.school_id, self.class_id, self.book_id)
 
     def get_sub_type(self):
         sql = "SELECT DISTINCT book_type FROM king_book_library WHERE book_id IN (%s)" % self.book_id
@@ -322,14 +344,14 @@ class GetStwInfo(StwInfoBase):
         if int(subtype_result) == 2 or int(subtype_result) == 5:
             if not self.class_id or self.class_id == 0:
                 sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
-                        CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)/10 AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_rate)/SUM(topic_num)AS SIGNED),\
+                        CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num) AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_rate)/SUM(topic_num)AS SIGNED),\
                         CAST(SUM(time_cost)/(SUM(topic_num))AS SIGNED),CAST(SUM(homework_num)+SUM(self_work_num)AS SIGNED) \
                         FROM king_common_count_daily WHERE school_id IN (%s) AND (date_time >= '%s' AND date_time <= '%s')\
                         AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
                             % (self.school_id, self.start_date, self.end_date, self.book_id)
             else:
                 sql_select = "SELECT student_id,student_name,school_id,school_name,class_name,total_integral,CAST(SUM(game_integral)AS SIGNED),CAST(SUM(homework_num)AS SIGNED),\
-                        CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num)/10 AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_rate)/SUM(topic_num)AS SIGNED),\
+                        CAST(SUM(self_work_num)AS SIGNED),CAST(SUM(topic_num) AS SIGNED),CAST(SUM(qst_right_num)AS SIGNED),CAST(SUM(qst_right_rate)/SUM(topic_num)AS SIGNED),\
                         CAST(SUM(time_cost)/(SUM(topic_num))AS SIGNED),CAST(SUM(homework_num)+SUM(self_work_num)AS SIGNED)\
                         FROM king_common_count_daily WHERE class_id IN (%s)AND (date_time >= '%s' AND date_time <= '%s')\
                         AND book_id IN (%s) GROUP BY student_id,student_name,school_id,school_name,class_name,total_integral" \
@@ -358,22 +380,35 @@ class GetStwInfo(StwInfoBase):
         except Exception as e:
             all_user = list()
             log('kingInfoError:', e)
+
         user_data = pd.DataFrame(all_user)
-        user_data['userid'] = user_data['userid'].astype(int)
+        if not user_data.empty:
+            user_data['userid'] = user_data['userid'].astype(int)
         try:
-            live_hp = []#self.get_live_hp()
-            hp_data = pd.DataFrame(live_hp)
-            hp_data['studentId'] = hp_data['studentId'].astype(int)
-            del (hp_data['schoolId'], hp_data['classId'], hp_data['grade'])
+            live_hp = self.get_live_hp()
         except Exception as e:
-            hp_data = list()
+            live_hp = list()
             log('kingInfoError:', e)
-        if hp_data:
-            user_hp_data = pd.merge(user_data, hp_data, how='left', left_on='userid', right_on='studentId')
+
+        hp_data = pd.DataFrame(live_hp)
+        if not hp_data.empty:
+            hp_data['studentId'] = hp_data['studentId'].astype(int)
+            hp_data.rename(columns={'studentId': 'userid'}, inplace=True)
+            del (hp_data['schoolId'], hp_data['classId'], hp_data['grade'])
+            user_hp_data = pd.merge(user_data, hp_data, how='left', on='userid')
         else:
             user_data['hp'] = user_data['credit'] = 0
             user_hp_data = user_data
         values = pd.merge(user_hp_data, results, how='left', on='userid')
+        try:
+            user_integral = self.get_live_integral()
+        except Exception as e:
+            user_integral = pd.DataFrame()
+            log('kingInfoError:', e)
+
+        if not user_integral.empty:
+            del (values['countscore'])
+            values = pd.merge(values, user_integral, on='userid', how='left')
         values = values.fillna(value=0)
         values = values.to_dict(orient='records')
         # messes = []
