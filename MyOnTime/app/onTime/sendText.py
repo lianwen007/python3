@@ -9,8 +9,5 @@ def on_time_etl():
     pass
 
 
-def send_mess():
-    pass
-
 
 sched.start()
